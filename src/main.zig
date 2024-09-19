@@ -1,6 +1,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+const cpu = @import("psx/cpu.zig");
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -25,4 +27,14 @@ pub fn main() !void {
         return err;
     };
     defer file.close();
+
+    var bios_buffer: [cpu.BIOS_SizeBytes]u8 = undefined;
+    const bios_bytes_read = try file.read(&bios_buffer);
+
+    assert(bios_bytes_read == bios_buffer.len);
+
+    var psx = cpu.create_psx_state(bios_buffer);
+    defer cpu.destroy_psx_state(&psx);
+
+    cpu.execute(&psx);
 }
