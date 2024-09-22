@@ -27,7 +27,7 @@ const BIOS_Offset = 0x1fc00000;
 const BIOS_OffsetEnd = BIOS_Offset + BIOS_SizeBytes;
 
 const PSXState = struct {
-    reg: Registers = .{},
+    registers: Registers = .{},
     bios: [BIOS_SizeBytes]u8,
 };
 
@@ -41,20 +41,293 @@ pub fn destroy_psx_state(psx: *PSXState) void {
     _ = psx;
 }
 
+// Register Name Conventional use
+const RegisterName = enum(u5) {
+    zero = 0, // Always zero
+    at = 1, // Assembler temporary
+    v0 = 2, // Function return values
+    v1 = 3,
+    a0 = 4, // Function arguments
+    a1,
+    a2,
+    a3,
+    t0 = 8, // Temporary registers
+    t1,
+    t2,
+    t3,
+    t4,
+    t5,
+    t6,
+    t7,
+    s0 = 16, // Saved registers
+    s1,
+    s2,
+    s3,
+    s4,
+    s5,
+    s6,
+    s7,
+    t8 = 24, // Temporary registers
+    t9 = 25,
+    k0 = 26, // Kernel reserved registers
+    k1 = 27,
+    gp = 28, // Global pointer
+    sp = 29, // Stack pointer
+    fp = 30, // Frame pointer
+    ra = 31, // Function return address
+};
+
 const Registers = struct {
     pc: u32 = 0xbfc00000, // Program Counter
+    r: [32]u32 = undefined, // FIXME does it have an initial value?
+};
+
+fn load_reg(registers: Registers, register_name: RegisterName) u32 {
+    return switch (register_name) {
+        .zero => 0,
+        else => registers.r[@intFromEnum(register_name)],
+    };
+}
+
+fn store_reg(registers: *Registers, register_name: RegisterName, value: u32) void {
+    switch (register_name) {
+        .zero => {},
+        else => registers.r[@intFromEnum(register_name)] = value,
+    }
+}
+
+const PrimaryOpCode = enum(u6) {
+    SPECIAL = 0x00,
+    BcondZ = 0x01,
+    J = 0x02,
+    JAL = 0x03,
+    BEQ = 0x04,
+    BNE = 0x05,
+    BLEZ = 0x06,
+    BGTZ = 0x07,
+    ADDI = 0x08,
+    ADDIU = 0x09,
+    SLTI = 0x0A,
+    SLTIU = 0x0B,
+    ANDI = 0x0C,
+    ORI = 0x0D,
+    XORI = 0x0E,
+    LUI = 0x0F,
+    COP0 = 0x10,
+    COP1 = 0x11,
+    COP2 = 0x12,
+    COP3 = 0x13,
+
+    LB = 0x20,
+    LH = 0x21,
+    LWL = 0x22,
+    LW = 0x23,
+    LBU = 0x24,
+    LHU = 0x25,
+    LWR = 0x26,
+
+    SB = 0x28,
+    SH = 0x29,
+    SWL = 0x2A,
+    SW = 0x2B,
+
+    SWR = 0x2E,
+
+    LWC0 = 0x30,
+    LWC1 = 0x31,
+    LWC2 = 0x32,
+    LWC3 = 0x33,
+
+    SWC0 = 0x38,
+    SWC1 = 0x39,
+    SWC2 = 0x3A,
+    SWC3 = 0x3B,
+    _,
+};
+
+const SecondaryOpCode = enum(u6) {
+    SLL = 0x00,
+
+    SRL = 0x02,
+    SRA = 0x03,
+    SLLV = 0x04,
+
+    SRLV = 0x06,
+    SRAV = 0x07,
+    JR = 0x08,
+    JALR = 0x09,
+
+    SYSCALL = 0x0C,
+    BREAK = 0x0D,
+
+    MFHI = 0x10,
+    MTHI = 0x11,
+    MFLO = 0x12,
+    MTLO = 0x13,
+
+    MULT = 0x18,
+    MULTU = 0x19,
+    DIV = 0x1A,
+    DIVU = 0x1B,
+
+    ADD = 0x20,
+    ADDU = 0x21,
+    SUB = 0x22,
+    SUBU = 0x23,
+    AND = 0x24,
+    OR = 0x25,
+    XOR = 0x26,
+    NOR = 0x27,
+
+    SLT = 0x2A,
+    SLTU = 0x2B,
+    _,
+};
+
+// Opcode/Parameter Encoding
+//
+//   31..26 |25..21|20..16|15..11|10..6 |  5..0  |
+//    6bit  | 5bit | 5bit | 5bit | 5bit |  6bit  |
+//   -------+------+------+------+------+--------+------------
+//   000000 | N/A  | rt   | rd   | imm5 | 0000xx | shift-imm
+//   000000 | rs   | rt   | rd   | N/A  | 0001xx | shift-reg
+//   000000 | rs   | N/A  | N/A  | N/A  | 001000 | jr
+//   000000 | rs   | N/A  | rd   | N/A  | 001001 | jalr
+//   000000 | <-----comment20bit------> | 00110x | sys/brk
+//   000000 | N/A  | N/A  | rd   | N/A  | 0100x0 | mfhi/mflo
+//   000000 | rs   | N/A  | N/A  | N/A  | 0100x1 | mthi/mtlo
+//   000000 | rs   | rt   | N/A  | N/A  | 0110xx | mul/div
+//   000000 | rs   | rt   | rd   | N/A  | 10xxxx | alu-reg
+//   000001 | rs   | 00000| <--immediate16bit--> | bltz
+//   000001 | rs   | 00001| <--immediate16bit--> | bgez
+//   000001 | rs   | 10000| <--immediate16bit--> | bltzal
+//   000001 | rs   | 10001| <--immediate16bit--> | bgezal
+//   000001 | rs   | xxxx0| <--immediate16bit--> | bltz  ;\undocumented dupes
+//   000001 | rs   | xxxx1| <--immediate16bit--> | bgez  ;/(when bit17-19=nonzero)
+//   00001x | <---------immediate26bit---------> | j/jal
+//   00010x | rs   | rt   | <--immediate16bit--> | beq/bne
+//   00011x | rs   | N/A  | <--immediate16bit--> | blez/bgtz
+//   001xxx | rs   | rt   | <--immediate16bit--> | alu-imm
+//   001111 | N/A  | rt   | <--immediate16bit--> | lui-imm
+//   100xxx | rs   | rt   | <--immediate16bit--> | load rt,[rs+imm]
+//   101xxx | rs   | rt   | <--immediate16bit--> | store rt,[rs+imm]
+//   x1xxxx | <------coprocessor specific------> | coprocessor (see below)
+const OpCodeHelper = packed struct {
+    b0_15: packed union {
+        encoding_a: packed struct {
+            secondary: SecondaryOpCode,
+            imm5: u5,
+            rd: RegisterName,
+        },
+        encoding_b: packed struct {
+            imm16: u16,
+        },
+    },
+    rt: RegisterName,
+    rs: RegisterName,
+    primary: PrimaryOpCode,
 };
 
 const Instruction = union(enum) {
     lui: lui,
+    ori: ori,
+    invalid,
+};
+
+const generic_alu_imm = struct {
+    rs: RegisterName,
+    rt: RegisterName,
+    imm16: u16,
 };
 
 const lui = struct {
-    fixme: u32,
+    rt: RegisterName,
+    imm16: u16,
 };
 
-fn decode_instruction(op_code: u32) Instruction {
-    return Instruction{ .lui = .{ .fixme = op_code } };
+const ori = generic_alu_imm;
+
+fn decode_instruction(op_u32: u32) Instruction {
+    const op: OpCodeHelper = @bitCast(op_u32);
+
+    return switch (op.primary) {
+        .SPECIAL => switch (op.b0_15.encoding_a.secondary) {
+            .SLL => unreachable,
+            .SRL => unreachable,
+            .SRA => unreachable,
+            .SLLV => unreachable,
+            .SRLV => unreachable,
+            .SRAV => unreachable,
+
+            .JR => unreachable,
+            .JALR => unreachable,
+            .SYSCALL => unreachable,
+            .BREAK => unreachable,
+
+            .MFHI => unreachable,
+            .MTHI => unreachable,
+            .MFLO => unreachable,
+            .MTLO => unreachable,
+
+            .MULT => unreachable,
+            .MULTU => unreachable,
+            .DIV => unreachable,
+            .DIVU => unreachable,
+
+            .ADD => unreachable,
+            .ADDU => unreachable,
+            .SUB => unreachable,
+            .SUBU => unreachable,
+            .AND => unreachable,
+            .OR => unreachable,
+            .XOR => unreachable,
+            .NOR => unreachable,
+
+            .SLT => unreachable,
+            .SLTU => unreachable,
+            else => unreachable,
+        },
+        .BcondZ => unreachable,
+        .J => unreachable,
+        .JAL => unreachable,
+        .BEQ => unreachable,
+        .BNE => unreachable,
+        .BLEZ => unreachable,
+        .BGTZ => unreachable,
+        .ADDI => unreachable,
+        .ADDIU => unreachable,
+        .SLTI => unreachable,
+        .SLTIU => unreachable,
+        .ANDI => unreachable,
+        .ORI => .{ .ori = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
+        .XORI => unreachable,
+        .LUI => .{ .lui = .{ .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
+        .COP0 => unreachable,
+        .COP1 => unreachable,
+        .COP2 => unreachable,
+        .COP3 => unreachable,
+        .LB => unreachable,
+        .LH => unreachable,
+        .LWL => unreachable,
+        .LW => unreachable,
+        .LBU => unreachable,
+        .LHU => unreachable,
+        .LWR => unreachable,
+        .SB => unreachable,
+        .SH => unreachable,
+        .SWL => unreachable,
+        .SW => unreachable,
+        .SWR => unreachable,
+        .LWC0 => unreachable,
+        .LWC1 => unreachable,
+        .LWC2 => unreachable,
+        .LWC3 => unreachable,
+        .SWC0 => unreachable,
+        .SWC1 => unreachable,
+        .SWC2 => unreachable,
+        .SWC3 => unreachable,
+        else => unreachable,
+    };
 }
 
 const PSXAddress = packed struct {
@@ -83,18 +356,34 @@ fn load_mem_u32(psx: *PSXState, address: PSXAddress) u32 {
     }
 }
 
+fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
+    switch (instruction) {
+        .lui => |i| execute_lui(psx, i),
+        .ori => |i| execute_ori(psx, i),
+        .invalid => unreachable,
+    }
+}
+
+fn execute_lui(psx: *PSXState, instruction: lui) void {
+    const value = @as(u32, instruction.imm16) << 16;
+    store_reg(&psx.registers, instruction.rt, value);
+}
+
+fn execute_ori(psx: *PSXState, instruction: ori) void {
+    const reg_value = load_reg(psx.registers, instruction.rs);
+    store_reg(&psx.registers, instruction.rt, reg_value | instruction.imm16);
+}
+
 pub fn execute(psx: *PSXState) void {
     while (true) {
-        const op_code = load_mem_u32(psx, @bitCast(psx.reg.pc));
+        const op_code = load_mem_u32(psx, @bitCast(psx.registers.pc));
 
-        std.debug.print("Got {x:0>8}\n", .{op_code});
+        std.debug.print("Got 0x{x:0>8} 0b{b:0>32}\n", .{ op_code, op_code });
 
         const instruction = decode_instruction(op_code);
 
-        switch (instruction) {
-            .lui => {},
-        }
+        execute_instruction(psx, instruction);
 
-        psx.reg.pc +%= 4;
+        psx.registers.pc +%= 4;
     }
 }
