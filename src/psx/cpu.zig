@@ -229,23 +229,26 @@ const OpCodeHelper = packed struct {
 };
 
 const Instruction = union(enum) {
-    lui: lui,
     ori: ori,
+    lui: lui,
+    sw: sw,
     invalid,
 };
 
-const generic_alu_imm = struct {
+const generic_rs_rt_imm16 = struct {
     rs: RegisterName,
     rt: RegisterName,
     imm16: u16,
 };
 
-const lui = struct {
+const generic_rt_imm16 = struct {
     rt: RegisterName,
     imm16: u16,
 };
 
-const ori = generic_alu_imm;
+const lui = generic_rt_imm16;
+const ori = generic_rs_rt_imm16;
+const sw = generic_rs_rt_imm16;
 
 fn decode_instruction(op_u32: u32) Instruction {
     const op: OpCodeHelper = @bitCast(op_u32);
@@ -316,7 +319,7 @@ fn decode_instruction(op_u32: u32) Instruction {
         .SB => unreachable,
         .SH => unreachable,
         .SWL => unreachable,
-        .SW => unreachable,
+        .SW => .{ .sw = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
         .SWR => unreachable,
         .LWC0 => unreachable,
         .LWC1 => unreachable,
@@ -340,7 +343,13 @@ const PSXAddress = packed struct {
     },
 };
 
-fn load_mem_u32(psx: *PSXState, address: PSXAddress) u32 {
+fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
+    std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
+
+    const address: PSXAddress = @bitCast(address_u32);
+
+    std.debug.assert(address.offset % 4 == 0); // FIXME implement bus errors
+
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
             switch (address.offset) {
@@ -356,29 +365,62 @@ fn load_mem_u32(psx: *PSXState, address: PSXAddress) u32 {
     }
 }
 
+fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
+    std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
+    std.debug.print("store value: 0x{x:0>8}\n", .{value});
+
+    const address: PSXAddress = @bitCast(address_u32);
+
+    std.debug.assert(address.offset % 4 == 0); // FIXME implement bus errors
+
+    switch (address.mapping) {
+        .Useg, .Seg0, .Seg1 => {
+            switch (address.offset) {
+                BIOS_Offset...BIOS_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - BIOS_Offset;
+                    const bios_u32_slice = psx.bios[local_offset .. local_offset + 4];
+                    std.mem.writeInt(u32, bios_u32_slice[0..4], value, .little);
+                },
+                else => unreachable,
+            }
+        },
+        .Seg2 => unreachable,
+    }
+}
+
 fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
     switch (instruction) {
-        .lui => |i| execute_lui(psx, i),
         .ori => |i| execute_ori(psx, i),
+        .lui => |i| execute_lui(psx, i),
+        .sw => |i| execute_sw(psx, i),
         .invalid => unreachable,
     }
 }
 
 fn execute_lui(psx: *PSXState, instruction: lui) void {
     const value = @as(u32, instruction.imm16) << 16;
+
     store_reg(&psx.registers, instruction.rt, value);
 }
 
 fn execute_ori(psx: *PSXState, instruction: ori) void {
     const reg_value = load_reg(psx.registers, instruction.rs);
+
     store_reg(&psx.registers, instruction.rt, reg_value | instruction.imm16);
+}
+
+fn execute_sw(psx: *PSXState, instruction: sw) void {
+    const value = load_reg(psx.registers, instruction.rt);
+    const address = load_reg(psx.registers, instruction.rs);
+
+    store_mem_u32(psx, address + instruction.imm16, value);
 }
 
 pub fn execute(psx: *PSXState) void {
     while (true) {
-        const op_code = load_mem_u32(psx, @bitCast(psx.registers.pc));
+        const op_code = load_mem_u32(psx, psx.registers.pc);
 
-        std.debug.print("Got 0x{x:0>8} 0b{b:0>32}\n", .{ op_code, op_code });
+        std.debug.print("Instruction Fetch 0x{x:0>8} 0b{b:0>32}\n", .{ op_code, op_code });
 
         const instruction = decode_instruction(op_code);
 
