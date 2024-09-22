@@ -229,6 +229,7 @@ const OpCodeHelper = packed struct {
 };
 
 const Instruction = union(enum) {
+    sll: sll,
     ori: ori,
     lui: lui,
     sw: sw,
@@ -246,6 +247,12 @@ const generic_rt_imm16 = struct {
     imm16: u16,
 };
 
+const sll = struct {
+    rt: RegisterName,
+    rd: RegisterName,
+    shift_imm: u5,
+};
+
 const lui = generic_rt_imm16;
 const ori = generic_rs_rt_imm16;
 const sw = generic_rs_rt_imm16;
@@ -255,7 +262,7 @@ fn decode_instruction(op_u32: u32) Instruction {
 
     return switch (op.primary) {
         .SPECIAL => switch (op.b0_15.encoding_a.secondary) {
-            .SLL => unreachable,
+            .SLL => .{ .sll = .{ .rt = op.rt, .rd = op.b0_15.encoding_a.rd, .shift_imm = op.b0_15.encoding_a.imm5 } },
             .SRL => unreachable,
             .SRA => unreachable,
             .SLLV => unreachable,
@@ -373,14 +380,23 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 
     std.debug.assert(address.offset % 4 == 0); // FIXME implement bus errors
 
+    _ = psx;
+
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
             switch (address.offset) {
-                BIOS_Offset...BIOS_OffsetEnd - 1 => |offset| {
-                    const local_offset = offset - BIOS_Offset;
-                    const bios_u32_slice = psx.bios[local_offset .. local_offset + 4];
-                    std.mem.writeInt(u32, bios_u32_slice[0..4], value, .little);
+                HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
+                    const local_offset: u13 = @intCast(offset - HWRegs_Offset);
+                    const local_offset_typed: HWRegOffsets = @enumFromInt(local_offset);
+                    switch (local_offset_typed) {
+                        .Expansion1BaseAddress => unreachable, // PSX programs aren't supposed to write here
+                        .Expansion2BaseAddress => unreachable, // PSX programs aren't supposed to write here
+                        else => {
+                            std.debug.print("FIXME store ignored at local offset {}\n", .{local_offset});
+                        },
+                    }
                 },
+                BIOS_Offset...BIOS_OffsetEnd - 1 => unreachable, // This should be read-only
                 else => unreachable,
             }
         },
@@ -390,11 +406,18 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 
 fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
     switch (instruction) {
+        .sll => |i| execute_sll(psx, i),
         .ori => |i| execute_ori(psx, i),
         .lui => |i| execute_lui(psx, i),
         .sw => |i| execute_sw(psx, i),
         .invalid => unreachable,
     }
+}
+
+fn execute_sll(psx: *PSXState, instruction: sll) void {
+    const reg_value = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
 }
 
 fn execute_lui(psx: *PSXState, instruction: lui) void {
@@ -411,9 +434,12 @@ fn execute_ori(psx: *PSXState, instruction: ori) void {
 
 fn execute_sw(psx: *PSXState, instruction: sw) void {
     const value = load_reg(psx.registers, instruction.rt);
-    const address = load_reg(psx.registers, instruction.rs);
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address_offset_signed: i16 = @bitCast(instruction.imm16);
+    // NOTE: using two's-complement to ignore signedness
+    const address = address_base +% @as(u32, @bitCast(@as(i32, address_offset_signed)));
 
-    store_mem_u32(psx, address + instruction.imm16, value);
+    store_mem_u32(psx, address, value);
 }
 
 pub fn execute(psx: *PSXState) void {
@@ -429,3 +455,9 @@ pub fn execute(psx: *PSXState) void {
         psx.registers.pc +%= 4;
     }
 }
+
+const HWRegOffsets = enum(u13) {
+    Expansion1BaseAddress = 0,
+    Expansion2BaseAddress = 4,
+    _,
+};
