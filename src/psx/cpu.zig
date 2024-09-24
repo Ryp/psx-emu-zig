@@ -230,6 +230,7 @@ const OpCodeHelper = packed struct {
 
 const Instruction = union(enum) {
     sll: sll,
+    j: j,
     addiu: addiu,
     ori: ori,
     lui: lui,
@@ -248,12 +249,17 @@ const generic_rt_imm16 = struct {
     imm16: u16,
 };
 
+const j = struct {
+    offset: u28,
+};
+
 const sll = struct {
     rt: RegisterName,
     rd: RegisterName,
     shift_imm: u5,
 };
 
+const addi = generic_rs_rt_imm16;
 const addiu = generic_rs_rt_imm16;
 const ori = generic_rs_rt_imm16;
 const lui = generic_rt_imm16;
@@ -300,7 +306,7 @@ fn decode_instruction(op_u32: u32) Instruction {
             else => unreachable,
         },
         .BcondZ => unreachable,
-        .J => unreachable,
+        .J => .{ .j = .{ .offset = @as(u26, @truncate(op_u32)) << 2 } },
         .JAL => unreachable,
         .BEQ => unreachable,
         .BNE => unreachable,
@@ -409,6 +415,7 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
+        .j => |i| execute_j(psx, i),
         .addiu => |i| execute_addiu(psx, i),
         .ori => |i| execute_ori(psx, i),
         .lui => |i| execute_lui(psx, i),
@@ -423,7 +430,11 @@ fn execute_sll(psx: *PSXState, instruction: sll) void {
     store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
 }
 
-fn execute_addi(psx: *PSXState, instruction: ori) void {
+fn execute_j(psx: *PSXState, instruction: j) void {
+    psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
+}
+
+fn execute_addi(psx: *PSXState, instruction: addi) void {
     const value = load_reg(psx.registers, instruction.rs);
 
     const result, const overflow = @addWithOverflow(value, instruction.imm16);
@@ -434,7 +445,7 @@ fn execute_addi(psx: *PSXState, instruction: ori) void {
     store_reg(&psx.registers, instruction.rt, result);
 }
 
-fn execute_addiu(psx: *PSXState, instruction: ori) void {
+fn execute_addiu(psx: *PSXState, instruction: addiu) void {
     const value = load_reg(psx.registers, instruction.rs);
 
     store_reg(&psx.registers, instruction.rt, value +% instruction.imm16);
