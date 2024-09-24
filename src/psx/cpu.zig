@@ -230,6 +230,7 @@ const OpCodeHelper = packed struct {
 
 const Instruction = union(enum) {
     sll: sll,
+    addiu: addiu,
     ori: ori,
     lui: lui,
     sw: sw,
@@ -253,8 +254,9 @@ const sll = struct {
     shift_imm: u5,
 };
 
-const lui = generic_rt_imm16;
+const addiu = generic_rs_rt_imm16;
 const ori = generic_rs_rt_imm16;
+const lui = generic_rt_imm16;
 const sw = generic_rs_rt_imm16;
 
 fn decode_instruction(op_u32: u32) Instruction {
@@ -305,7 +307,7 @@ fn decode_instruction(op_u32: u32) Instruction {
         .BLEZ => unreachable,
         .BGTZ => unreachable,
         .ADDI => unreachable,
-        .ADDIU => unreachable,
+        .ADDIU => .{ .addiu = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
         .SLTI => unreachable,
         .SLTIU => unreachable,
         .ANDI => unreachable,
@@ -407,6 +409,7 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
+        .addiu => |i| execute_addiu(psx, i),
         .ori => |i| execute_ori(psx, i),
         .lui => |i| execute_lui(psx, i),
         .sw => |i| execute_sw(psx, i),
@@ -420,16 +423,33 @@ fn execute_sll(psx: *PSXState, instruction: sll) void {
     store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
 }
 
+fn execute_addi(psx: *PSXState, instruction: ori) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    const result, const overflow = @addWithOverflow(value, instruction.imm16);
+
+    // FIXME Handle overflow exception
+    _ = overflow;
+
+    store_reg(&psx.registers, instruction.rt, result);
+}
+
+fn execute_addiu(psx: *PSXState, instruction: ori) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    store_reg(&psx.registers, instruction.rt, value +% instruction.imm16);
+}
+
+fn execute_ori(psx: *PSXState, instruction: ori) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    store_reg(&psx.registers, instruction.rt, value | instruction.imm16);
+}
+
 fn execute_lui(psx: *PSXState, instruction: lui) void {
     const value = @as(u32, instruction.imm16) << 16;
 
     store_reg(&psx.registers, instruction.rt, value);
-}
-
-fn execute_ori(psx: *PSXState, instruction: ori) void {
-    const reg_value = load_reg(psx.registers, instruction.rs);
-
-    store_reg(&psx.registers, instruction.rt, reg_value | instruction.imm16);
 }
 
 fn execute_sw(psx: *PSXState, instruction: sw) void {
