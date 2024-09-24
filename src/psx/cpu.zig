@@ -474,16 +474,22 @@ fn execute_sw(psx: *PSXState, instruction: sw) void {
 }
 
 pub fn execute(psx: *PSXState) void {
+    const nop = decode_instruction(0);
+    var next_instruction = nop;
+
     while (true) {
-        const op_code = load_mem_u32(psx, psx.registers.pc);
+        const instruction = next_instruction;
 
-        std.debug.print("Instruction Fetch 0x{x:0>8} 0b{b:0>32}\n", .{ op_code, op_code });
+        const next_op_code = load_mem_u32(psx, psx.registers.pc);
 
-        const instruction = decode_instruction(op_code);
+        std.debug.print("Next Instruction Fetch 0x{x:0>8} 0b{b:0>32}\n", .{ next_op_code, next_op_code });
+
+        next_instruction = decode_instruction(next_op_code);
+
+        // Execution is pipelined so we increment the PC before even starting to execute the current instruction
+        psx.registers.pc +%= 4;
 
         execute_instruction(psx, instruction);
-
-        psx.registers.pc +%= 4;
     }
 }
 
