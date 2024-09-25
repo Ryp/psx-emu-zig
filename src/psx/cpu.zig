@@ -230,12 +230,27 @@ const OpCodeHelper = packed struct {
 
 const Instruction = union(enum) {
     sll: sll,
+    add: add,
+    addu: addu,
+    sub: sub,
+    subu: subu,
+    and_: and_,
+    or_: or_,
+    xor: xor,
+    nor: nor,
     j: j,
+    addi: addi,
     addiu: addiu,
     ori: ori,
     lui: lui,
     sw: sw,
     invalid,
+};
+
+const generic_rs_rt_rd = struct {
+    rs: RegisterName,
+    rt: RegisterName,
+    rd: RegisterName,
 };
 
 const generic_rs_rt_imm16 = struct {
@@ -259,6 +274,14 @@ const sll = struct {
     shift_imm: u5,
 };
 
+const add = generic_rs_rt_rd;
+const addu = generic_rs_rt_rd;
+const sub = generic_rs_rt_rd;
+const subu = generic_rs_rt_rd;
+const and_ = generic_rs_rt_rd;
+const or_ = generic_rs_rt_rd;
+const xor = generic_rs_rt_rd;
+const nor = generic_rs_rt_rd;
 const addi = generic_rs_rt_imm16;
 const addiu = generic_rs_rt_imm16;
 const ori = generic_rs_rt_imm16;
@@ -292,27 +315,27 @@ fn decode_instruction(op_u32: u32) Instruction {
             .DIV => unreachable,
             .DIVU => unreachable,
 
-            .ADD => unreachable,
-            .ADDU => unreachable,
-            .SUB => unreachable,
-            .SUBU => unreachable,
-            .AND => unreachable,
-            .OR => unreachable,
-            .XOR => unreachable,
-            .NOR => unreachable,
+            .ADD => .{ .add = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .ADDU => .{ .addu = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .SUB => .{ .sub = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .SUBU => .{ .subu = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .AND => .{ .and_ = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .OR => .{ .or_ = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .XOR => .{ .xor = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .NOR => .{ .nor = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
 
             .SLT => unreachable,
             .SLTU => unreachable,
             else => unreachable,
         },
         .BcondZ => unreachable,
-        .J => .{ .j = .{ .offset = @as(u26, @truncate(op_u32)) << 2 } },
+        .J => .{ .j = .{ .offset = @as(u28, @as(u26, @truncate(op_u32))) << 2 } },
         .JAL => unreachable,
         .BEQ => unreachable,
         .BNE => unreachable,
         .BLEZ => unreachable,
         .BGTZ => unreachable,
-        .ADDI => unreachable,
+        .ADDI => .{ .addi = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
         .ADDIU => .{ .addiu = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
         .SLTI => unreachable,
         .SLTIU => unreachable,
@@ -400,7 +423,7 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
                         .Expansion1BaseAddress => unreachable, // PSX programs aren't supposed to write here
                         .Expansion2BaseAddress => unreachable, // PSX programs aren't supposed to write here
                         else => {
-                            std.debug.print("FIXME store ignored at local offset {}\n", .{local_offset});
+                            std.debug.print("FIXME store ignored at local offset 0x{x:0>8}\n", .{local_offset});
                         },
                     }
                 },
@@ -408,14 +431,30 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
                 else => unreachable,
             }
         },
-        .Seg2 => unreachable,
+        .Seg2 => {
+            switch (address.offset) {
+                0x1ffe0130 => {
+                    std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
+                },
+                else => unreachable,
+            }
+        },
     }
 }
 
 fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
+        .add => |i| execute_ralu(psx, i),
+        .addu => |i| execute_ralu(psx, i),
+        .sub => |i| execute_ralu(psx, i),
+        .subu => |i| execute_ralu(psx, i),
+        .and_ => |i| execute_ralu(psx, i),
+        .or_ => |i| execute_or(psx, i),
+        .xor => |i| execute_ralu(psx, i),
+        .nor => |i| execute_ralu(psx, i),
         .j => |i| execute_j(psx, i),
+        .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
         .ori => |i| execute_ori(psx, i),
         .lui => |i| execute_lui(psx, i),
@@ -428,6 +467,23 @@ fn execute_sll(psx: *PSXState, instruction: sll) void {
     const reg_value = load_reg(psx.registers, instruction.rt);
 
     store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
+}
+
+fn execute_or(psx: *PSXState, instruction: or_) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, value_s | value_t);
+}
+
+// FIXME
+fn execute_ralu(psx: *PSXState, instruction: generic_rs_rt_rd) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, value_s * value_t * 0); // FIXME
+
+    unreachable;
 }
 
 fn execute_j(psx: *PSXState, instruction: j) void {
@@ -476,20 +532,73 @@ fn execute_sw(psx: *PSXState, instruction: sw) void {
 pub fn execute(psx: *PSXState) void {
     const nop = decode_instruction(0);
     var next_instruction = nop;
+    var next_op_code: u32 = 0;
 
     while (true) {
         const instruction = next_instruction;
+        const op_code = next_op_code;
 
-        const next_op_code = load_mem_u32(psx, psx.registers.pc);
-
-        std.debug.print("Next Instruction Fetch 0x{x:0>8} 0b{b:0>32}\n", .{ next_op_code, next_op_code });
+        next_op_code = load_mem_u32(psx, psx.registers.pc);
 
         next_instruction = decode_instruction(next_op_code);
 
         // Execution is pipelined so we increment the PC before even starting to execute the current instruction
         psx.registers.pc +%= 4;
 
+        print_instruction(op_code, instruction);
+
         execute_instruction(psx, instruction);
+    }
+}
+
+// FIXME check order
+// FIXME rework this a lot
+fn print_i_instruction(op_name: [:0]const u8, instruction: generic_rs_rt_imm16) void {
+    std.debug.print("{s} ${}, ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.rs, instruction.imm16 });
+}
+
+fn print_r_instruction(op_name: [:0]const u8, instruction: generic_rt_imm16) void {
+    std.debug.print("{s} ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.imm16 });
+}
+
+fn print_j_instruction(instruction: j) void {
+    std.debug.print("j 0x{x:0>8}\n", .{instruction.offset});
+}
+
+fn print_sll_instruction(instruction: sll) void {
+    if (instruction.rd == .zero and instruction.rt == .zero and instruction.shift_imm == 0) {
+        std.debug.print("nop\n", .{});
+    } else {
+        std.debug.print("sll ${}, ${}, 0x{x:0>4}\n", .{ instruction.rd, instruction.rt, instruction.shift_imm });
+    }
+}
+
+fn print_ralu_instruction(op_name: [:0]const u8, instruction: generic_rs_rt_rd) void {
+    std.debug.print("{s} ${}, ${}, ${}\n", .{ op_name, instruction.rd, instruction.rt, instruction.rs });
+}
+
+fn print_instruction(op_code: u32, instruction: Instruction) void {
+    std.debug.print("0b{b:0>32} 0x{x:0>8} ", .{ op_code, op_code });
+
+    switch (instruction) {
+        .sll => |i| print_sll_instruction(i),
+
+        .add => |i| print_ralu_instruction("add", i),
+        .addu => |i| print_ralu_instruction("addu", i),
+        .sub => |i| print_ralu_instruction("sub", i),
+        .subu => |i| print_ralu_instruction("subu", i),
+        .and_ => |i| print_ralu_instruction("and", i),
+        .or_ => |i| print_ralu_instruction("or", i),
+        .xor => |i| print_ralu_instruction("xor", i),
+        .nor => |i| print_ralu_instruction("nor", i),
+
+        .j => |i| print_j_instruction(i),
+        .addi => |i| print_i_instruction("addi", i),
+        .addiu => |i| print_i_instruction("addiu", i),
+        .ori => |i| print_i_instruction("ori", i),
+        .lui => |i| print_r_instruction("lui", i),
+        .sw => |i| print_i_instruction("sw", i),
+        .invalid => unreachable,
     }
 }
 
