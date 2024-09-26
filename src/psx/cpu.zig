@@ -80,6 +80,7 @@ const RegisterName = enum(u5) {
 const Registers = struct {
     pc: u32 = 0xbfc00000, // Program Counter
     r: [32]u32 = undefined, // FIXME does it have an initial value?
+    sr: u32 = undefined,
 };
 
 fn load_reg(registers: Registers, register_name: RegisterName) u32 {
@@ -239,6 +240,7 @@ const Instruction = union(enum) {
     xor: xor,
     nor: nor,
     j: j,
+    mtc0: mtc0,
     addi: addi,
     addiu: addiu,
     ori: ori,
@@ -274,6 +276,11 @@ const sll = struct {
     shift_imm: u5,
 };
 
+const mtc0 = struct {
+    cpu_rs: RegisterName,
+    cop_rt: u5,
+};
+
 const add = generic_rs_rt_rd;
 const addu = generic_rs_rt_rd;
 const sub = generic_rs_rt_rd;
@@ -290,6 +297,20 @@ const sw = generic_rs_rt_imm16;
 
 fn decode_instruction(op_u32: u32) Instruction {
     const op: OpCodeHelper = @bitCast(op_u32);
+
+    const Cop0_Op = enum(u5) {
+        mtc0 = 0b00100,
+        _,
+    };
+
+    const Cop0 = packed struct {
+        _unused: u11,
+        rt: RegisterName,
+        rs: RegisterName,
+        op: Cop0_Op,
+        primary: PrimaryOpCode,
+    };
+    const op_cop0: Cop0 = @bitCast(op_u32);
 
     return switch (op.primary) {
         .SPECIAL => switch (op.b0_15.encoding_a.secondary) {
@@ -343,7 +364,10 @@ fn decode_instruction(op_u32: u32) Instruction {
         .ORI => .{ .ori = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
         .XORI => unreachable,
         .LUI => .{ .lui = .{ .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
-        .COP0 => unreachable,
+        .COP0 => switch (op_cop0.op) {
+            .mtc0 => .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .cop_rt = @intFromEnum(op_cop0.rt) } },
+            else => unreachable,
+        },
         .COP1 => unreachable,
         .COP2 => unreachable,
         .COP3 => unreachable,
@@ -407,11 +431,14 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
     std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
     std.debug.print("store value: 0x{x:0>8}\n", .{value});
 
+    if (psx.registers.sr & 0x00010000 != 0) {
+        std.debug.print("FIXME store ignored because of cache isolation\n", .{});
+        return;
+    }
+
     const address: PSXAddress = @bitCast(address_u32);
 
     std.debug.assert(address.offset % 4 == 0); // FIXME implement bus errors
-
-    _ = psx;
 
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
@@ -454,6 +481,7 @@ fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
         .xor => |i| execute_ralu(psx, i),
         .nor => |i| execute_ralu(psx, i),
         .j => |i| execute_j(psx, i),
+        .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
         .ori => |i| execute_ori(psx, i),
@@ -490,6 +518,15 @@ fn execute_j(psx: *PSXState, instruction: j) void {
     psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
 }
 
+fn execute_mtc0(psx: *PSXState, instruction: mtc0) void {
+    const value = load_reg(psx.registers, instruction.cpu_rs);
+
+    switch (instruction.cop_rt) {
+        12 => psx.registers.sr = value,
+        else => unreachable,
+    }
+}
+
 fn execute_addi(psx: *PSXState, instruction: addi) void {
     const value = load_reg(psx.registers, instruction.rs);
 
@@ -499,6 +536,8 @@ fn execute_addi(psx: *PSXState, instruction: addi) void {
     _ = overflow;
 
     store_reg(&psx.registers, instruction.rt, result);
+
+    unreachable;
 }
 
 fn execute_addiu(psx: *PSXState, instruction: addiu) void {
@@ -577,6 +616,10 @@ fn print_ralu_instruction(op_name: [:0]const u8, instruction: generic_rs_rt_rd) 
     std.debug.print("{s} ${}, ${}, ${}\n", .{ op_name, instruction.rd, instruction.rt, instruction.rs });
 }
 
+fn print_cop0_instruction(instruction: mtc0) void {
+    std.debug.print("mtc0 ${}, $cop0_{}\n", .{ instruction.cpu_rs, instruction.cop_rt });
+}
+
 fn print_instruction(op_code: u32, instruction: Instruction) void {
     std.debug.print("0b{b:0>32} 0x{x:0>8} ", .{ op_code, op_code });
 
@@ -593,6 +636,7 @@ fn print_instruction(op_code: u32, instruction: Instruction) void {
         .nor => |i| print_ralu_instruction("nor", i),
 
         .j => |i| print_j_instruction(i),
+        .mtc0 => |i| print_cop0_instruction(i),
         .addi => |i| print_i_instruction("addi", i),
         .addiu => |i| print_i_instruction("addiu", i),
         .ori => |i| print_i_instruction("ori", i),
