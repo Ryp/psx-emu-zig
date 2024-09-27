@@ -2,94 +2,6 @@ const std = @import("std");
 
 const cpu = @import("cpu.zig");
 
-const PrimaryOpCode = enum(u6) {
-    SPECIAL = 0x00,
-    BcondZ = 0x01,
-    J = 0x02,
-    JAL = 0x03,
-    BEQ = 0x04,
-    BNE = 0x05,
-    BLEZ = 0x06,
-    BGTZ = 0x07,
-    ADDI = 0x08,
-    ADDIU = 0x09,
-    SLTI = 0x0A,
-    SLTIU = 0x0B,
-    ANDI = 0x0C,
-    ORI = 0x0D,
-    XORI = 0x0E,
-    LUI = 0x0F,
-    COP0 = 0x10,
-    COP1 = 0x11,
-    COP2 = 0x12,
-    COP3 = 0x13,
-
-    LB = 0x20,
-    LH = 0x21,
-    LWL = 0x22,
-    LW = 0x23,
-    LBU = 0x24,
-    LHU = 0x25,
-    LWR = 0x26,
-
-    SB = 0x28,
-    SH = 0x29,
-    SWL = 0x2A,
-    SW = 0x2B,
-
-    SWR = 0x2E,
-
-    LWC0 = 0x30,
-    LWC1 = 0x31,
-    LWC2 = 0x32,
-    LWC3 = 0x33,
-
-    SWC0 = 0x38,
-    SWC1 = 0x39,
-    SWC2 = 0x3A,
-    SWC3 = 0x3B,
-    _,
-};
-
-const SecondaryOpCode = enum(u6) {
-    SLL = 0x00,
-
-    SRL = 0x02,
-    SRA = 0x03,
-    SLLV = 0x04,
-
-    SRLV = 0x06,
-    SRAV = 0x07,
-    JR = 0x08,
-    JALR = 0x09,
-
-    SYSCALL = 0x0C,
-    BREAK = 0x0D,
-
-    MFHI = 0x10,
-    MTHI = 0x11,
-    MFLO = 0x12,
-    MTLO = 0x13,
-
-    MULT = 0x18,
-    MULTU = 0x19,
-    DIV = 0x1A,
-    DIVU = 0x1B,
-
-    ADD = 0x20,
-    ADDU = 0x21,
-    SUB = 0x22,
-    SUBU = 0x23,
-    AND = 0x24,
-    OR = 0x25,
-    XOR = 0x26,
-    NOR = 0x27,
-
-    SLT = 0x2A,
-    SLTU = 0x2B,
-    _,
-};
-
 // Opcode/Parameter Encoding
 //
 //   31..26 |25..21|20..16|15..11|10..6 |  5..0  |
@@ -133,72 +45,6 @@ const OpCodeHelper = packed struct {
     rs: cpu.RegisterName,
     primary: PrimaryOpCode,
 };
-
-pub const Instruction = union(enum) {
-    sll: sll,
-    add: add,
-    addu: addu,
-    sub: sub,
-    subu: subu,
-    and_: and_,
-    or_: or_,
-    xor: xor,
-    nor: nor,
-    j: j,
-    mtc0: mtc0,
-    addi: addi,
-    addiu: addiu,
-    ori: ori,
-    lui: lui,
-    sw: sw,
-    invalid,
-};
-
-pub const generic_rs_rt_rd = struct {
-    rs: cpu.RegisterName,
-    rt: cpu.RegisterName,
-    rd: cpu.RegisterName,
-};
-
-pub const generic_rs_rt_imm16 = struct {
-    rs: cpu.RegisterName,
-    rt: cpu.RegisterName,
-    imm16: u16,
-};
-
-pub const generic_rt_imm16 = struct {
-    rt: cpu.RegisterName,
-    imm16: u16,
-};
-
-pub const j = struct {
-    offset: u28,
-};
-
-pub const sll = struct {
-    rt: cpu.RegisterName,
-    rd: cpu.RegisterName,
-    shift_imm: u5,
-};
-
-pub const mtc0 = struct {
-    cpu_rs: cpu.RegisterName,
-    cop_rt: u5,
-};
-
-pub const add = generic_rs_rt_rd;
-pub const addu = generic_rs_rt_rd;
-pub const sub = generic_rs_rt_rd;
-pub const subu = generic_rs_rt_rd;
-pub const and_ = generic_rs_rt_rd;
-pub const or_ = generic_rs_rt_rd;
-pub const xor = generic_rs_rt_rd;
-pub const nor = generic_rs_rt_rd;
-pub const addi = generic_rs_rt_imm16;
-pub const addiu = generic_rs_rt_imm16;
-pub const ori = generic_rs_rt_imm16;
-pub const lui = generic_rt_imm16;
-pub const sw = generic_rs_rt_imm16;
 
 pub fn decode_instruction(op_u32: u32) Instruction {
     const op: OpCodeHelper = @bitCast(op_u32);
@@ -299,3 +145,157 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         else => unreachable,
     };
 }
+
+const PrimaryOpCode = enum(u6) {
+    SPECIAL = 0x00,
+    BcondZ = 0x01,
+    J = 0x02,
+    JAL = 0x03,
+    BEQ = 0x04,
+    BNE = 0x05,
+    BLEZ = 0x06,
+    BGTZ = 0x07,
+    ADDI = 0x08,
+    ADDIU = 0x09,
+    SLTI = 0x0A,
+    SLTIU = 0x0B,
+    ANDI = 0x0C,
+    ORI = 0x0D,
+    XORI = 0x0E,
+    LUI = 0x0F,
+    COP0 = 0x10,
+    COP1 = 0x11,
+    COP2 = 0x12,
+    COP3 = 0x13,
+
+    LB = 0x20,
+    LH = 0x21,
+    LWL = 0x22,
+    LW = 0x23,
+    LBU = 0x24,
+    LHU = 0x25,
+    LWR = 0x26,
+
+    SB = 0x28,
+    SH = 0x29,
+    SWL = 0x2A,
+    SW = 0x2B,
+
+    SWR = 0x2E,
+
+    LWC0 = 0x30,
+    LWC1 = 0x31,
+    LWC2 = 0x32,
+    LWC3 = 0x33,
+
+    SWC0 = 0x38,
+    SWC1 = 0x39,
+    SWC2 = 0x3A,
+    SWC3 = 0x3B,
+    _,
+};
+
+const SecondaryOpCode = enum(u6) {
+    SLL = 0x00,
+
+    SRL = 0x02,
+    SRA = 0x03,
+    SLLV = 0x04,
+
+    SRLV = 0x06,
+    SRAV = 0x07,
+    JR = 0x08,
+    JALR = 0x09,
+
+    SYSCALL = 0x0C,
+    BREAK = 0x0D,
+
+    MFHI = 0x10,
+    MTHI = 0x11,
+    MFLO = 0x12,
+    MTLO = 0x13,
+
+    MULT = 0x18,
+    MULTU = 0x19,
+    DIV = 0x1A,
+    DIVU = 0x1B,
+
+    ADD = 0x20,
+    ADDU = 0x21,
+    SUB = 0x22,
+    SUBU = 0x23,
+    AND = 0x24,
+    OR = 0x25,
+    XOR = 0x26,
+    NOR = 0x27,
+
+    SLT = 0x2A,
+    SLTU = 0x2B,
+    _,
+};
+
+pub const Instruction = union(enum) {
+    sll: sll,
+    add: add,
+    addu: addu,
+    sub: sub,
+    subu: subu,
+    and_: and_,
+    or_: or_,
+    xor: xor,
+    nor: nor,
+    j: j,
+    mtc0: mtc0,
+    addi: addi,
+    addiu: addiu,
+    ori: ori,
+    lui: lui,
+    sw: sw,
+    invalid,
+};
+
+pub const generic_rs_rt_rd = struct {
+    rs: cpu.RegisterName,
+    rt: cpu.RegisterName,
+    rd: cpu.RegisterName,
+};
+
+pub const generic_rs_rt_imm16 = struct {
+    rs: cpu.RegisterName,
+    rt: cpu.RegisterName,
+    imm16: u16,
+};
+
+pub const generic_rt_imm16 = struct {
+    rt: cpu.RegisterName,
+    imm16: u16,
+};
+
+pub const j = struct {
+    offset: u28,
+};
+
+pub const sll = struct {
+    rt: cpu.RegisterName,
+    rd: cpu.RegisterName,
+    shift_imm: u5,
+};
+
+pub const mtc0 = struct {
+    cpu_rs: cpu.RegisterName,
+    cop_rt: u5,
+};
+
+pub const add = generic_rs_rt_rd;
+pub const addu = generic_rs_rt_rd;
+pub const sub = generic_rs_rt_rd;
+pub const subu = generic_rs_rt_rd;
+pub const and_ = generic_rs_rt_rd;
+pub const or_ = generic_rs_rt_rd;
+pub const xor = generic_rs_rt_rd;
+pub const nor = generic_rs_rt_rd;
+pub const addi = generic_rs_rt_imm16;
+pub const addiu = generic_rs_rt_imm16;
+pub const ori = generic_rs_rt_imm16;
+pub const lui = generic_rt_imm16;
+pub const sw = generic_rs_rt_imm16;
