@@ -1,8 +1,9 @@
 const std = @import("std");
 
+const instructions = @import("cpu_instructions.zig");
 const cpu = @import("cpu.zig");
 
-pub fn print_instruction(op_code: u32, instruction: cpu.Instruction) void {
+pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) void {
     std.debug.print("0b{b:0>32} 0x{x:0>8} ", .{ op_code, op_code });
 
     switch (instruction) {
@@ -30,19 +31,19 @@ pub fn print_instruction(op_code: u32, instruction: cpu.Instruction) void {
 
 // FIXME check order
 // FIXME rework this a lot
-fn print_i_instruction(op_name: [:0]const u8, instruction: cpu.generic_rs_rt_imm16) void {
+fn print_i_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm16) void {
     std.debug.print("{s} ${}, ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.rs, instruction.imm16 });
 }
 
-fn print_r_instruction(op_name: [:0]const u8, instruction: cpu.generic_rt_imm16) void {
+fn print_r_instruction(op_name: [:0]const u8, instruction: instructions.generic_rt_imm16) void {
     std.debug.print("{s} ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.imm16 });
 }
 
-fn print_j_instruction(instruction: cpu.j) void {
+fn print_j_instruction(instruction: instructions.j) void {
     std.debug.print("j 0x{x:0>8}\n", .{instruction.offset});
 }
 
-fn print_sll_instruction(instruction: cpu.sll) void {
+fn print_sll_instruction(instruction: instructions.sll) void {
     if (instruction.rd == .zero and instruction.rt == .zero and instruction.shift_imm == 0) {
         std.debug.print("nop\n", .{});
     } else {
@@ -50,10 +51,10 @@ fn print_sll_instruction(instruction: cpu.sll) void {
     }
 }
 
-fn print_ralu_instruction(op_name: [:0]const u8, instruction: cpu.generic_rs_rt_rd) void {
+fn print_ralu_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_rd) void {
     std.debug.print("{s} ${}, ${}, ${}\n", .{ op_name, instruction.rd, instruction.rt, instruction.rs });
 }
 
-fn print_cop0_instruction(instruction: cpu.mtc0) void {
+fn print_cop0_instruction(instruction: instructions.mtc0) void {
     std.debug.print("mtc0 ${}, $cop0_{}\n", .{ instruction.cpu_rs, instruction.cop_rt });
 }
