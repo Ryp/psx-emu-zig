@@ -447,8 +447,9 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
                     const local_offset: u13 = @intCast(offset - HWRegs_Offset);
                     const local_offset_typed: HWRegOffsets = @enumFromInt(local_offset);
                     switch (local_offset_typed) {
-                        .Expansion1BaseAddress => unreachable, // PSX programs aren't supposed to write here
-                        .Expansion2BaseAddress => unreachable, // PSX programs aren't supposed to write here
+                        .Expansion1BaseAddress, .Expansion2BaseAddress => {
+                            std.debug.print("FIXME store ignored to expansion register 0x{x:0>8}\n", .{local_offset});
+                        },
                         else => {
                             std.debug.print("FIXME store ignored at local offset 0x{x:0>8}\n", .{local_offset});
                         },
