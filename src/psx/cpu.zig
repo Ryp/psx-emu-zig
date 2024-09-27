@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const cpu_debug = @import("cpu_debug.zig");
+const cpu_execution = @import("cpu_execution.zig");
 
 // KUSEG       KSEG0     KSEG1 Length Description
 // 0x00000000 0x80000000 0xa0000000 2048K Main RAM
@@ -28,7 +29,7 @@ pub const BIOS_SizeBytes = 512 * 1024;
 const BIOS_Offset = 0x1fc00000;
 const BIOS_OffsetEnd = BIOS_Offset + BIOS_SizeBytes;
 
-const PSXState = struct {
+pub const PSXState = struct {
     registers: Registers = .{},
     bios: [BIOS_SizeBytes]u8,
 };
@@ -44,7 +45,7 @@ pub fn destroy_psx_state(psx: *PSXState) void {
 }
 
 // Register Name Conventional use
-const RegisterName = enum(u5) {
+pub const RegisterName = enum(u5) {
     zero = 0, // Always zero
     at = 1, // Assembler temporary
     v0 = 2, // Function return values
@@ -79,25 +80,11 @@ const RegisterName = enum(u5) {
     ra = 31, // Function return address
 };
 
-const Registers = struct {
+pub const Registers = struct {
     pc: u32 = 0xbfc00000, // Program Counter
     r: [32]u32 = undefined, // FIXME does it have an initial value?
     sr: u32 = undefined,
 };
-
-fn load_reg(registers: Registers, register_name: RegisterName) u32 {
-    return switch (register_name) {
-        .zero => 0,
-        else => registers.r[@intFromEnum(register_name)],
-    };
-}
-
-fn store_reg(registers: *Registers, register_name: RegisterName, value: u32) void {
-    switch (register_name) {
-        .zero => {},
-        else => registers.r[@intFromEnum(register_name)] = value,
-    }
-}
 
 const PrimaryOpCode = enum(u6) {
     SPECIAL = 0x00,
@@ -231,7 +218,7 @@ const OpCodeHelper = packed struct {
     primary: PrimaryOpCode,
 };
 
-const Instruction = union(enum) {
+pub const Instruction = union(enum) {
     sll: sll,
     add: add,
     addu: addu,
@@ -251,51 +238,51 @@ const Instruction = union(enum) {
     invalid,
 };
 
-const generic_rs_rt_rd = struct {
+pub const generic_rs_rt_rd = struct {
     rs: RegisterName,
     rt: RegisterName,
     rd: RegisterName,
 };
 
-const generic_rs_rt_imm16 = struct {
+pub const generic_rs_rt_imm16 = struct {
     rs: RegisterName,
     rt: RegisterName,
     imm16: u16,
 };
 
-const generic_rt_imm16 = struct {
+pub const generic_rt_imm16 = struct {
     rt: RegisterName,
     imm16: u16,
 };
 
-const j = struct {
+pub const j = struct {
     offset: u28,
 };
 
-const sll = struct {
+pub const sll = struct {
     rt: RegisterName,
     rd: RegisterName,
     shift_imm: u5,
 };
 
-const mtc0 = struct {
+pub const mtc0 = struct {
     cpu_rs: RegisterName,
     cop_rt: u5,
 };
 
-const add = generic_rs_rt_rd;
-const addu = generic_rs_rt_rd;
-const sub = generic_rs_rt_rd;
-const subu = generic_rs_rt_rd;
-const and_ = generic_rs_rt_rd;
-const or_ = generic_rs_rt_rd;
-const xor = generic_rs_rt_rd;
-const nor = generic_rs_rt_rd;
-const addi = generic_rs_rt_imm16;
-const addiu = generic_rs_rt_imm16;
-const ori = generic_rs_rt_imm16;
-const lui = generic_rt_imm16;
-const sw = generic_rs_rt_imm16;
+pub const add = generic_rs_rt_rd;
+pub const addu = generic_rs_rt_rd;
+pub const sub = generic_rs_rt_rd;
+pub const subu = generic_rs_rt_rd;
+pub const and_ = generic_rs_rt_rd;
+pub const or_ = generic_rs_rt_rd;
+pub const xor = generic_rs_rt_rd;
+pub const nor = generic_rs_rt_rd;
+pub const addi = generic_rs_rt_imm16;
+pub const addiu = generic_rs_rt_imm16;
+pub const ori = generic_rs_rt_imm16;
+pub const lui = generic_rt_imm16;
+pub const sw = generic_rs_rt_imm16;
 
 fn decode_instruction(op_u32: u32) Instruction {
     const op: OpCodeHelper = @bitCast(op_u32);
@@ -407,7 +394,7 @@ const PSXAddress = packed struct {
     },
 };
 
-fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
+pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
     std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
 
     const address: PSXAddress = @bitCast(address_u32);
@@ -429,7 +416,7 @@ fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
     }
 }
 
-fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
+pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
     std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
     std.debug.print("store value: 0x{x:0>8}\n", .{value});
 
@@ -472,105 +459,6 @@ fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
     }
 }
 
-fn execute_instruction(psx: *PSXState, instruction: Instruction) void {
-    switch (instruction) {
-        .sll => |i| execute_sll(psx, i),
-        .add => |i| execute_ralu(psx, i),
-        .addu => |i| execute_ralu(psx, i),
-        .sub => |i| execute_ralu(psx, i),
-        .subu => |i| execute_ralu(psx, i),
-        .and_ => |i| execute_ralu(psx, i),
-        .or_ => |i| execute_or(psx, i),
-        .xor => |i| execute_ralu(psx, i),
-        .nor => |i| execute_ralu(psx, i),
-        .j => |i| execute_j(psx, i),
-        .mtc0 => |i| execute_mtc0(psx, i),
-        .addi => |i| execute_addi(psx, i),
-        .addiu => |i| execute_addiu(psx, i),
-        .ori => |i| execute_ori(psx, i),
-        .lui => |i| execute_lui(psx, i),
-        .sw => |i| execute_sw(psx, i),
-        .invalid => unreachable,
-    }
-}
-
-fn execute_sll(psx: *PSXState, instruction: sll) void {
-    const reg_value = load_reg(psx.registers, instruction.rt);
-
-    store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
-}
-
-fn execute_or(psx: *PSXState, instruction: or_) void {
-    const value_s = load_reg(psx.registers, instruction.rs);
-    const value_t = load_reg(psx.registers, instruction.rt);
-
-    store_reg(&psx.registers, instruction.rd, value_s | value_t);
-}
-
-// FIXME
-fn execute_ralu(psx: *PSXState, instruction: generic_rs_rt_rd) void {
-    const value_s = load_reg(psx.registers, instruction.rs);
-    const value_t = load_reg(psx.registers, instruction.rt);
-
-    store_reg(&psx.registers, instruction.rd, value_s * value_t * 0); // FIXME
-
-    unreachable;
-}
-
-fn execute_j(psx: *PSXState, instruction: j) void {
-    psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
-}
-
-fn execute_mtc0(psx: *PSXState, instruction: mtc0) void {
-    const value = load_reg(psx.registers, instruction.cpu_rs);
-
-    switch (instruction.cop_rt) {
-        12 => psx.registers.sr = value,
-        else => unreachable,
-    }
-}
-
-fn execute_addi(psx: *PSXState, instruction: addi) void {
-    const value = load_reg(psx.registers, instruction.rs);
-
-    const result, const overflow = @addWithOverflow(value, instruction.imm16);
-
-    // FIXME Handle overflow exception
-    _ = overflow;
-
-    store_reg(&psx.registers, instruction.rt, result);
-
-    unreachable;
-}
-
-fn execute_addiu(psx: *PSXState, instruction: addiu) void {
-    const value = load_reg(psx.registers, instruction.rs);
-
-    store_reg(&psx.registers, instruction.rt, value +% instruction.imm16);
-}
-
-fn execute_ori(psx: *PSXState, instruction: ori) void {
-    const value = load_reg(psx.registers, instruction.rs);
-
-    store_reg(&psx.registers, instruction.rt, value | instruction.imm16);
-}
-
-fn execute_lui(psx: *PSXState, instruction: lui) void {
-    const value = @as(u32, instruction.imm16) << 16;
-
-    store_reg(&psx.registers, instruction.rt, value);
-}
-
-fn execute_sw(psx: *PSXState, instruction: sw) void {
-    const value = load_reg(psx.registers, instruction.rt);
-    const address_base = load_reg(psx.registers, instruction.rs);
-    const address_offset_signed: i16 = @bitCast(instruction.imm16);
-    // NOTE: using two's-complement to ignore signedness
-    const address = address_base +% @as(u32, @bitCast(@as(i32, address_offset_signed)));
-
-    store_mem_u32(psx, address, value);
-}
-
 pub fn execute(psx: *PSXState) void {
     const nop = decode_instruction(0);
     var next_instruction = nop;
@@ -589,7 +477,7 @@ pub fn execute(psx: *PSXState) void {
 
         cpu_debug.print_instruction(op_code, instruction);
 
-        execute_instruction(psx, instruction);
+        cpu_execution.execute_instruction(psx, instruction);
     }
 }
 

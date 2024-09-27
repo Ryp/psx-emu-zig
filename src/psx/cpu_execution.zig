@@ -1,0 +1,118 @@
+const std = @import("std");
+
+const cpu = @import("cpu.zig");
+const PSXState = cpu.PSXState;
+const Registers = cpu.Registers;
+
+pub fn execute_instruction(psx: *PSXState, instruction: cpu.Instruction) void {
+    switch (instruction) {
+        .sll => |i| execute_sll(psx, i),
+        .add => |i| execute_ralu(psx, i),
+        .addu => |i| execute_ralu(psx, i),
+        .sub => |i| execute_ralu(psx, i),
+        .subu => |i| execute_ralu(psx, i),
+        .and_ => |i| execute_ralu(psx, i),
+        .or_ => |i| execute_or(psx, i),
+        .xor => |i| execute_ralu(psx, i),
+        .nor => |i| execute_ralu(psx, i),
+        .j => |i| execute_j(psx, i),
+        .mtc0 => |i| execute_mtc0(psx, i),
+        .addi => |i| execute_addi(psx, i),
+        .addiu => |i| execute_addiu(psx, i),
+        .ori => |i| execute_ori(psx, i),
+        .lui => |i| execute_lui(psx, i),
+        .sw => |i| execute_sw(psx, i),
+        .invalid => unreachable,
+    }
+}
+
+fn load_reg(registers: Registers, register_name: cpu.RegisterName) u32 {
+    return switch (register_name) {
+        .zero => 0,
+        else => registers.r[@intFromEnum(register_name)],
+    };
+}
+
+fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
+    switch (register_name) {
+        .zero => {},
+        else => registers.r[@intFromEnum(register_name)] = value,
+    }
+}
+
+fn execute_sll(psx: *PSXState, instruction: cpu.sll) void {
+    const reg_value = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
+}
+
+fn execute_or(psx: *PSXState, instruction: cpu.or_) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, value_s | value_t);
+}
+
+// FIXME
+fn execute_ralu(psx: *PSXState, instruction: cpu.generic_rs_rt_rd) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, value_s * value_t * 0); // FIXME
+
+    unreachable;
+}
+
+fn execute_j(psx: *PSXState, instruction: cpu.j) void {
+    psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
+}
+
+fn execute_mtc0(psx: *PSXState, instruction: cpu.mtc0) void {
+    const value = load_reg(psx.registers, instruction.cpu_rs);
+
+    switch (instruction.cop_rt) {
+        12 => psx.registers.sr = value,
+        else => unreachable,
+    }
+}
+
+fn execute_addi(psx: *PSXState, instruction: cpu.addi) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    const result, const overflow = @addWithOverflow(value, instruction.imm16);
+
+    // FIXME Handle overflow exception
+    _ = overflow;
+
+    store_reg(&psx.registers, instruction.rt, result);
+
+    unreachable;
+}
+
+fn execute_addiu(psx: *PSXState, instruction: cpu.addiu) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    store_reg(&psx.registers, instruction.rt, value +% instruction.imm16);
+}
+
+fn execute_ori(psx: *PSXState, instruction: cpu.ori) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    store_reg(&psx.registers, instruction.rt, value | instruction.imm16);
+}
+
+fn execute_lui(psx: *PSXState, instruction: cpu.lui) void {
+    const value = @as(u32, instruction.imm16) << 16;
+
+    store_reg(&psx.registers, instruction.rt, value);
+}
+
+fn execute_sw(psx: *PSXState, instruction: cpu.sw) void {
+    const value = load_reg(psx.registers, instruction.rt);
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address_offset_signed: i16 = @bitCast(instruction.imm16);
+    // NOTE: using two's-complement to ignore signedness
+    const address = address_base +% @as(u32, @bitCast(@as(i32, address_offset_signed)));
+
+    cpu.store_mem_u32(psx, address, value);
+}
