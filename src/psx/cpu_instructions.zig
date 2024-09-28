@@ -63,6 +63,7 @@ pub const Instruction = union(enum) {
     addiu: addiu,
     ori: ori,
     lui: lui,
+    lw: lw,
     sw: sw,
     invalid,
 };
@@ -128,14 +129,14 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .BNE => .{ .bne = .{ .rs = op.rs, .rt = op.rt, .rel_offset = @bitCast(@as(u18, op.b0_15.encoding_b.imm16) << 2) } },
         .BLEZ => unreachable,
         .BGTZ => unreachable,
-        .ADDI => .{ .addi = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
-        .ADDIU => .{ .addiu = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
+        .ADDI => .{ .addi = .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
+        .ADDIU => .{ .addiu = .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
         .SLTI => unreachable,
         .SLTIU => unreachable,
         .ANDI => unreachable,
-        .ORI => .{ .ori = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
+        .ORI => .{ .ori = .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
         .XORI => unreachable,
-        .LUI => .{ .lui = .{ .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
+        .LUI => .{ .lui = .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
         .COP0 => switch (op_cop0.op) {
             .mtc0 => .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .cop_rt = @intFromEnum(op_cop0.rt) } },
             else => unreachable,
@@ -146,14 +147,14 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .LB => unreachable,
         .LH => unreachable,
         .LWL => unreachable,
-        .LW => unreachable,
+        .LW => .{ .lw = .{ .rs = op.rs, .rt = op.rt, .imm_i16 = @bitCast(op.b0_15.encoding_b.imm16) } },
         .LBU => unreachable,
         .LHU => unreachable,
         .LWR => unreachable,
         .SB => unreachable,
         .SH => unreachable,
         .SWL => unreachable,
-        .SW => .{ .sw = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
+        .SW => .{ .sw = .{ .rs = op.rs, .rt = op.rt, .imm_i16 = @bitCast(op.b0_15.encoding_b.imm16) } },
         .SWR => unreachable,
         .LWC0 => unreachable,
         .LWC1 => unreachable,
@@ -261,15 +262,21 @@ pub const generic_rs_rt_rd = struct {
     rd: cpu.RegisterName,
 };
 
-pub const generic_rs_rt_imm16 = struct {
+pub const generic_rs_rt_imm_u16 = struct {
     rs: cpu.RegisterName,
     rt: cpu.RegisterName,
-    imm16: u16,
+    imm_u16: u16,
 };
 
-pub const generic_rt_imm16 = struct {
+pub const generic_rt_imm_u16 = struct {
     rt: cpu.RegisterName,
-    imm16: u16,
+    imm_u16: u16,
+};
+
+pub const generic_rs_rt_imm_i16 = struct {
+    rs: cpu.RegisterName,
+    rt: cpu.RegisterName,
+    imm_i16: i16,
 };
 
 pub const j = struct {
@@ -301,8 +308,9 @@ pub const and_ = generic_rs_rt_rd;
 pub const or_ = generic_rs_rt_rd;
 pub const xor = generic_rs_rt_rd;
 pub const nor = generic_rs_rt_rd;
-pub const addi = generic_rs_rt_imm16;
-pub const addiu = generic_rs_rt_imm16;
-pub const ori = generic_rs_rt_imm16;
-pub const lui = generic_rt_imm16;
-pub const sw = generic_rs_rt_imm16;
+pub const addi = generic_rs_rt_imm_u16;
+pub const addiu = generic_rs_rt_imm_u16;
+pub const ori = generic_rs_rt_imm_u16;
+pub const lui = generic_rt_imm_u16;
+pub const lw = generic_rs_rt_imm_i16;
+pub const sw = generic_rs_rt_imm_i16;

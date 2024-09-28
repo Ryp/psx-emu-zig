@@ -23,6 +23,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .addiu => |i| execute_addiu(psx, i),
         .ori => |i| execute_ori(psx, i),
         .lui => |i| execute_lui(psx, i),
+        .lw => |i| execute_lw(psx, i),
         .sw => |i| execute_sw(psx, i),
         .invalid => unreachable,
     }
@@ -92,40 +93,50 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
 fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
     const value = load_reg(psx.registers, instruction.rs);
 
-    const result, const overflow = @addWithOverflow(value, instruction.imm16);
+    const result, const overflow = @addWithOverflow(value, instruction.imm_u16);
 
-    // FIXME Handle overflow exception
-    _ = overflow;
+    if (overflow == 1) {
+        // FIXME Handle overflow exception
+        unreachable;
+    }
 
     store_reg(&psx.registers, instruction.rt, result);
-
-    unreachable;
 }
 
 fn execute_addiu(psx: *PSXState, instruction: instructions.addiu) void {
     const value = load_reg(psx.registers, instruction.rs);
 
-    store_reg(&psx.registers, instruction.rt, value +% instruction.imm16);
+    store_reg(&psx.registers, instruction.rt, value +% instruction.imm_u16);
 }
 
 fn execute_ori(psx: *PSXState, instruction: instructions.ori) void {
     const value = load_reg(psx.registers, instruction.rs);
 
-    store_reg(&psx.registers, instruction.rt, value | instruction.imm16);
+    store_reg(&psx.registers, instruction.rt, value | instruction.imm_u16);
 }
 
 fn execute_lui(psx: *PSXState, instruction: instructions.lui) void {
-    const value = @as(u32, instruction.imm16) << 16;
+    const value = @as(u32, instruction.imm_u16) << 16;
+
+    store_reg(&psx.registers, instruction.rt, value);
+}
+
+fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
+    const address_base = load_reg(psx.registers, instruction.rs);
+    // NOTE: using two's-complement to ignore signedness
+    const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
+
+    const value = cpu.load_mem_u32(psx, address);
 
     store_reg(&psx.registers, instruction.rt, value);
 }
 
 fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const value = load_reg(psx.registers, instruction.rt);
+
     const address_base = load_reg(psx.registers, instruction.rs);
-    const address_offset_signed: i16 = @bitCast(instruction.imm16);
     // NOTE: using two's-complement to ignore signedness
-    const address = address_base +% @as(u32, @bitCast(@as(i32, address_offset_signed)));
+    const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
 
     cpu.store_mem_u32(psx, address, value);
 }

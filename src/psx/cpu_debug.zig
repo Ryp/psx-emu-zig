@@ -26,19 +26,22 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .addiu => |i| print_i_instruction("addiu", i),
         .ori => |i| print_i_instruction("ori", i),
         .lui => |i| print_r_instruction("lui", i),
-        .sw => |i| print_i_instruction("sw", i),
+        .lw => |i| print_i_mem_instruction("lw", i),
+        .sw => |i| print_i_mem_instruction("sw", i),
         .invalid => unreachable,
     }
 }
 
-// FIXME check order
-// FIXME rework this a lot
-fn print_i_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm16) void {
-    std.debug.print("{s} ${}, ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.rs, instruction.imm16 });
+fn print_i_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm_u16) void {
+    std.debug.print("{s} ${}, ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.rs, instruction.imm_u16 });
 }
 
-fn print_r_instruction(op_name: [:0]const u8, instruction: instructions.generic_rt_imm16) void {
-    std.debug.print("{s} ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.imm16 });
+fn print_i_mem_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm_i16) void {
+    std.debug.print("{s} ${}, {}(${})\n", .{ op_name, instruction.rt, instruction.imm_i16, instruction.rs });
+}
+
+fn print_r_instruction(op_name: [:0]const u8, instruction: instructions.generic_rt_imm_u16) void {
+    std.debug.print("{s} ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.imm_u16 });
 }
 
 fn print_j_instruction(instruction: instructions.j) void {
