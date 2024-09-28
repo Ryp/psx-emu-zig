@@ -19,6 +19,8 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .nor => |i| print_ralu_instruction("nor", i),
 
         .j => |i| print_j_instruction(i),
+        .bne => |i| print_bne_instruction(i),
+
         .mtc0 => |i| print_cop0_instruction(i),
         .addi => |i| print_i_instruction("addi", i),
         .addiu => |i| print_i_instruction("addiu", i),
@@ -41,6 +43,10 @@ fn print_r_instruction(op_name: [:0]const u8, instruction: instructions.generic_
 
 fn print_j_instruction(instruction: instructions.j) void {
     std.debug.print("j 0x{x:0>8}\n", .{instruction.offset});
+}
+
+fn print_bne_instruction(instruction: instructions.bne) void {
+    std.debug.print("bne ${}, ${}, {}\n", .{ instruction.rt, instruction.rs, instruction.rel_offset });
 }
 
 fn print_sll_instruction(instruction: instructions.sll) void {

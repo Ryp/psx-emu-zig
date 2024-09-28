@@ -17,6 +17,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .xor => |i| execute_ralu(psx, i),
         .nor => |i| execute_ralu(psx, i),
         .j => |i| execute_j(psx, i),
+        .bne => |i| execute_bne(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
@@ -66,6 +67,17 @@ fn execute_ralu(psx: *PSXState, instruction: instructions.generic_rs_rt_rd) void
 
 fn execute_j(psx: *PSXState, instruction: instructions.j) void {
     psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
+}
+
+fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    if (value_s != value_t) {
+        // NOTE: using two's-complement to ignore signedness
+        psx.registers.pc +%= @as(u32, @bitCast(@as(i32, instruction.rel_offset)));
+        psx.registers.pc -%= 4;
+    }
 }
 
 fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {

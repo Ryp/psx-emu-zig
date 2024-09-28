@@ -46,6 +46,27 @@ const OpCodeHelper = packed struct {
     primary: PrimaryOpCode,
 };
 
+pub const Instruction = union(enum) {
+    sll: sll,
+    add: add,
+    addu: addu,
+    sub: sub,
+    subu: subu,
+    and_: and_,
+    or_: or_,
+    xor: xor,
+    nor: nor,
+    j: j,
+    bne: bne,
+    mtc0: mtc0,
+    addi: addi,
+    addiu: addiu,
+    ori: ori,
+    lui: lui,
+    sw: sw,
+    invalid,
+};
+
 pub fn decode_instruction(op_u32: u32) Instruction {
     const op: OpCodeHelper = @bitCast(op_u32);
 
@@ -104,7 +125,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .J => .{ .j = .{ .offset = @as(u28, @as(u26, @truncate(op_u32))) << 2 } },
         .JAL => unreachable,
         .BEQ => unreachable,
-        .BNE => unreachable,
+        .BNE => .{ .bne = .{ .rs = op.rs, .rt = op.rt, .rel_offset = @bitCast(@as(u18, op.b0_15.encoding_b.imm16) << 2) } },
         .BLEZ => unreachable,
         .BGTZ => unreachable,
         .ADDI => .{ .addi = .{ .rs = op.rs, .rt = op.rt, .imm16 = op.b0_15.encoding_b.imm16 } },
@@ -234,26 +255,6 @@ const SecondaryOpCode = enum(u6) {
     _,
 };
 
-pub const Instruction = union(enum) {
-    sll: sll,
-    add: add,
-    addu: addu,
-    sub: sub,
-    subu: subu,
-    and_: and_,
-    or_: or_,
-    xor: xor,
-    nor: nor,
-    j: j,
-    mtc0: mtc0,
-    addi: addi,
-    addiu: addiu,
-    ori: ori,
-    lui: lui,
-    sw: sw,
-    invalid,
-};
-
 pub const generic_rs_rt_rd = struct {
     rs: cpu.RegisterName,
     rt: cpu.RegisterName,
@@ -273,6 +274,12 @@ pub const generic_rt_imm16 = struct {
 
 pub const j = struct {
     offset: u28,
+};
+
+pub const bne = struct {
+    rs: cpu.RegisterName,
+    rt: cpu.RegisterName,
+    rel_offset: i18,
 };
 
 pub const sll = struct {
