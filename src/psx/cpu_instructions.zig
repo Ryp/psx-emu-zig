@@ -109,34 +109,34 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .DIV => unreachable,
             .DIVU => unreachable,
 
-            .ADD => .{ .add = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .ADDU => .{ .addu = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .SUB => .{ .sub = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .SUBU => .{ .subu = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .AND => .{ .and_ = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .OR => .{ .or_ = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .XOR => .{ .xor = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
-            .NOR => .{ .nor = .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd } },
+            .ADD => .{ .add = decode_generic_rs_rt_rd(op_u32) },
+            .ADDU => .{ .addu = decode_generic_rs_rt_rd(op_u32) },
+            .SUB => .{ .sub = decode_generic_rs_rt_rd(op_u32) },
+            .SUBU => .{ .subu = decode_generic_rs_rt_rd(op_u32) },
+            .AND => .{ .and_ = decode_generic_rs_rt_rd(op_u32) },
+            .OR => .{ .or_ = decode_generic_rs_rt_rd(op_u32) },
+            .XOR => .{ .xor = decode_generic_rs_rt_rd(op_u32) },
+            .NOR => .{ .nor = decode_generic_rs_rt_rd(op_u32) },
 
             .SLT => unreachable,
             .SLTU => unreachable,
             else => unreachable,
         },
         .BcondZ => unreachable,
-        .J => .{ .j = .{ .offset = @as(u28, @as(u26, @truncate(op_u32))) << 2 } },
+        .J => .{ .j = decode_generic_j(op_u32) },
         .JAL => unreachable,
         .BEQ => unreachable,
         .BNE => .{ .bne = .{ .rs = op.rs, .rt = op.rt, .rel_offset = @bitCast(@as(u18, op.b0_15.encoding_b.imm16) << 2) } },
         .BLEZ => unreachable,
         .BGTZ => unreachable,
-        .ADDI => .{ .addi = .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
-        .ADDIU => .{ .addiu = .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
+        .ADDI => .{ .addi = decode_generic_rs_rt_imm_u16(op_u32) },
+        .ADDIU => .{ .addiu = decode_generic_rs_rt_imm_u16(op_u32) },
         .SLTI => unreachable,
         .SLTIU => unreachable,
         .ANDI => unreachable,
-        .ORI => .{ .ori = .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
+        .ORI => .{ .ori = decode_generic_rs_rt_imm_u16(op_u32) },
         .XORI => unreachable,
-        .LUI => .{ .lui = .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 } },
+        .LUI => .{ .lui = decode_generic_rt_imm_u16(op_u32) },
         .COP0 => switch (op_cop0.op) {
             .mtc0 => .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .cop_rt = @intFromEnum(op_cop0.rt) } },
             else => unreachable,
@@ -147,14 +147,14 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .LB => unreachable,
         .LH => unreachable,
         .LWL => unreachable,
-        .LW => .{ .lw = .{ .rs = op.rs, .rt = op.rt, .imm_i16 = @bitCast(op.b0_15.encoding_b.imm16) } },
+        .LW => .{ .lw = decode_generic_rs_rt_imm_i16(op_u32) },
         .LBU => unreachable,
         .LHU => unreachable,
         .LWR => unreachable,
         .SB => unreachable,
         .SH => unreachable,
         .SWL => unreachable,
-        .SW => .{ .sw = .{ .rs = op.rs, .rt = op.rt, .imm_i16 = @bitCast(op.b0_15.encoding_b.imm16) } },
+        .SW => .{ .sw = decode_generic_rs_rt_imm_i16(op_u32) },
         .SWR => unreachable,
         .LWC0 => unreachable,
         .LWC1 => unreachable,
@@ -256,22 +256,37 @@ const SecondaryOpCode = enum(u6) {
     _,
 };
 
-pub const generic_rs_rt_rd = struct {
-    rs: cpu.RegisterName,
-    rt: cpu.RegisterName,
-    rd: cpu.RegisterName,
-};
-
 pub const generic_rs_rt_imm_u16 = struct {
     rs: cpu.RegisterName,
     rt: cpu.RegisterName,
     imm_u16: u16,
 };
 
+fn decode_generic_rs_rt_imm_u16(op_u32: u32) generic_rs_rt_imm_u16 {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rs = op.rs, .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 };
+}
+
+pub const generic_rs_rt_rd = struct {
+    rs: cpu.RegisterName,
+    rt: cpu.RegisterName,
+    rd: cpu.RegisterName,
+};
+
+fn decode_generic_rs_rt_rd(op_u32: u32) generic_rs_rt_rd {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd };
+}
+
 pub const generic_rt_imm_u16 = struct {
     rt: cpu.RegisterName,
     imm_u16: u16,
 };
+
+fn decode_generic_rt_imm_u16(op_u32: u32) generic_rt_imm_u16 {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 };
+}
 
 pub const generic_rs_rt_imm_i16 = struct {
     rs: cpu.RegisterName,
@@ -279,9 +294,20 @@ pub const generic_rs_rt_imm_i16 = struct {
     imm_i16: i16,
 };
 
-pub const j = struct {
+fn decode_generic_rs_rt_imm_i16(op_u32: u32) generic_rs_rt_imm_i16 {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rs = op.rs, .rt = op.rt, .imm_i16 = @bitCast(op.b0_15.encoding_b.imm16) };
+}
+
+const generic_j = struct {
     offset: u28,
 };
+
+fn decode_generic_j(op_u32: u32) generic_j {
+    return .{ .offset = @as(u28, @as(u26, @truncate(op_u32))) << 2 };
+}
+
+pub const j = generic_j;
 
 pub const bne = struct {
     rs: cpu.RegisterName,

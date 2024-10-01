@@ -8,14 +8,14 @@ const Registers = cpu.Registers;
 pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) void {
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
-        .add => |i| execute_ralu(psx, i),
-        .addu => |i| execute_ralu(psx, i),
-        .sub => |i| execute_ralu(psx, i),
-        .subu => |i| execute_ralu(psx, i),
-        .and_ => |i| execute_ralu(psx, i),
+        .add => |i| execute_add(psx, i),
+        .addu => |i| execute_addu(psx, i),
+        .sub => |i| execute_sub(psx, i),
+        .subu => |i| execute_subu(psx, i),
+        .and_ => |i| execute_and(psx, i),
         .or_ => |i| execute_or(psx, i),
-        .xor => |i| execute_ralu(psx, i),
-        .nor => |i| execute_ralu(psx, i),
+        .xor => |i| execute_xor(psx, i),
+        .nor => |i| execute_nor(psx, i),
         .j => |i| execute_j(psx, i),
         .bne => |i| execute_bne(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
@@ -49,6 +49,53 @@ fn execute_sll(psx: *PSXState, instruction: instructions.sll) void {
     store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
 }
 
+fn execute_add(psx: *PSXState, instruction: instructions.add) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    _ = value_s;
+    _ = value_t;
+    unreachable;
+    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+}
+
+fn execute_addu(psx: *PSXState, instruction: instructions.addu) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    _ = value_s;
+    _ = value_t;
+    unreachable;
+    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+}
+
+fn execute_sub(psx: *PSXState, instruction: instructions.sub) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    _ = value_s;
+    _ = value_t;
+    unreachable;
+    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+}
+
+fn execute_subu(psx: *PSXState, instruction: instructions.subu) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    _ = value_s;
+    _ = value_t;
+    unreachable;
+    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+}
+
+fn execute_and(psx: *PSXState, instruction: instructions.and_) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, value_s & value_t);
+}
+
 fn execute_or(psx: *PSXState, instruction: instructions.or_) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
@@ -56,14 +103,18 @@ fn execute_or(psx: *PSXState, instruction: instructions.or_) void {
     store_reg(&psx.registers, instruction.rd, value_s | value_t);
 }
 
-// FIXME
-fn execute_ralu(psx: *PSXState, instruction: instructions.generic_rs_rt_rd) void {
+fn execute_xor(psx: *PSXState, instruction: instructions.xor) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    store_reg(&psx.registers, instruction.rd, value_s * value_t * 0); // FIXME
+    store_reg(&psx.registers, instruction.rd, value_s ^ value_t);
+}
 
-    unreachable;
+fn execute_nor(psx: *PSXState, instruction: instructions.nor) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    store_reg(&psx.registers, instruction.rd, ~(value_s | value_t));
 }
 
 fn execute_j(psx: *PSXState, instruction: instructions.j) void {
@@ -93,6 +144,7 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
 fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
     const value = load_reg(psx.registers, instruction.rs);
 
+    // FIXME should we support negative overflow as well?
     const result, const overflow = @addWithOverflow(value, instruction.imm_u16);
 
     if (overflow == 1) {
