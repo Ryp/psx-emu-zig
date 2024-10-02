@@ -33,8 +33,8 @@ pub fn main() !void {
 
     assert(bios_bytes_read == bios_buffer.len);
 
-    var psx = cpu.create_psx_state(bios_buffer);
-    defer cpu.destroy_psx_state(&psx);
+    var psx = try cpu.create_psx_state(bios_buffer, allocator);
+    defer cpu.destroy_psx_state(&psx, allocator);
 
     cpu.execute(&psx);
 }

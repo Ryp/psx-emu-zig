@@ -33,16 +33,21 @@ const BIOS_OffsetEnd = BIOS_Offset + BIOS_SizeBytes;
 pub const PSXState = struct {
     registers: Registers = .{},
     bios: [BIOS_SizeBytes]u8,
+    ram: []u8,
 };
 
-pub fn create_psx_state(bios: [BIOS_SizeBytes]u8) PSXState {
+pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) !PSXState {
+    const ram = try allocator.alloc(u8, RAM_SizeBytes);
+    errdefer allocator.free(ram);
+
     return PSXState{
         .bios = bios,
+        .ram = ram,
     };
 }
 
-pub fn destroy_psx_state(psx: *PSXState) void {
-    _ = psx;
+pub fn destroy_psx_state(psx: *PSXState, allocator: std.mem.Allocator) void {
+    allocator.free(psx.ram);
 }
 
 // Register Name Conventional use
@@ -109,10 +114,15 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
             switch (address.offset) {
+                RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - RAM_Offset;
+                    const u32_slice = psx.ram[local_offset..];
+                    return std.mem.readInt(u32, u32_slice[0..4], .little);
+                },
                 BIOS_Offset...BIOS_OffsetEnd - 1 => |offset| {
                     const local_offset = offset - BIOS_Offset;
-                    const bios_u32_slice = psx.bios[local_offset .. local_offset + 4];
-                    return std.mem.readInt(u32, bios_u32_slice[0..4], .little);
+                    const u32_slice = psx.bios[local_offset..];
+                    return std.mem.readInt(u32, u32_slice[0..4], .little);
                 },
                 else => unreachable,
             }
@@ -137,6 +147,11 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
             switch (address.offset) {
+                RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - RAM_Offset;
+                    const u32_slice = psx.ram[local_offset..];
+                    return std.mem.writeInt(u32, u32_slice[0..4], value, .little);
+                },
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     const local_offset: u13 = @intCast(offset - HWRegs_Offset);
                     const local_offset_typed: HWRegOffsets = @enumFromInt(local_offset);
