@@ -16,6 +16,8 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .or_ => |i| execute_or(psx, i),
         .xor => |i| execute_xor(psx, i),
         .nor => |i| execute_nor(psx, i),
+        .slt => unreachable,
+        .sltu => |i| execute_sltu(psx, i),
         .j => |i| execute_j(psx, i),
         .bne => |i| execute_bne(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
@@ -115,6 +117,15 @@ fn execute_nor(psx: *PSXState, instruction: instructions.nor) void {
     const value_t = load_reg(psx.registers, instruction.rt);
 
     store_reg(&psx.registers, instruction.rd, ~(value_s | value_t));
+}
+
+fn execute_sltu(psx: *PSXState, instruction: instructions.nor) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    const result: u32 = if (value_s < value_t) 1 else 0;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_j(psx: *PSXState, instruction: instructions.j) void {

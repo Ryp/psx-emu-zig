@@ -17,6 +17,8 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .or_ => |i| print_ralu_instruction("or", i),
         .xor => |i| print_ralu_instruction("xor", i),
         .nor => |i| print_ralu_instruction("nor", i),
+        .slt => |i| print_ralu_instruction("slt", i),
+        .sltu => |i| print_ralu_instruction("sltu", i),
 
         .j => |i| print_j_instruction(i),
         .bne => |i| print_bne_instruction(i),

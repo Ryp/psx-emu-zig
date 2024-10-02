@@ -56,6 +56,8 @@ pub const Instruction = union(enum) {
     or_: or_,
     xor: xor,
     nor: nor,
+    slt: slt,
+    sltu: sltu,
     j: j,
     bne: bne,
     mtc0: mtc0,
@@ -104,8 +106,8 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .XOR => .{ .xor = decode_generic_rs_rt_rd(op_u32) },
             .NOR => .{ .nor = decode_generic_rs_rt_rd(op_u32) },
 
-            .SLT => unreachable,
-            .SLTU => unreachable,
+            .SLT => .{ .slt = decode_generic_rs_rt_rd(op_u32) },
+            .SLTU => .{ .sltu = decode_generic_rs_rt_rd(op_u32) },
             _ => .{ .invalid = undefined },
         },
         .BcondZ => unreachable,
@@ -351,6 +353,8 @@ pub const and_ = generic_rs_rt_rd;
 pub const or_ = generic_rs_rt_rd;
 pub const xor = generic_rs_rt_rd;
 pub const nor = generic_rs_rt_rd;
+pub const slt = generic_rs_rt_rd;
+pub const sltu = generic_rs_rt_rd;
 pub const addi = generic_rs_rt_imm_u16;
 pub const addiu = generic_rs_rt_imm_u16;
 pub const ori = generic_rs_rt_imm_u16;
