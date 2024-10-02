@@ -32,14 +32,14 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
 fn load_reg(registers: Registers, register_name: cpu.RegisterName) u32 {
     return switch (register_name) {
         .zero => 0,
-        else => registers.r[@intFromEnum(register_name)],
+        else => registers.r_in[@intFromEnum(register_name)],
     };
 }
 
-fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
+pub fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
     switch (register_name) {
         .zero => {},
-        else => registers.r[@intFromEnum(register_name)] = value,
+        else => registers.r_out[@intFromEnum(register_name)] = value,
     }
 }
 
@@ -180,7 +180,7 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
 
     const value = cpu.load_mem_u32(psx, address);
 
-    store_reg(&psx.registers, instruction.rt, value);
+    psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
 }
 
 fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {

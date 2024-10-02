@@ -83,7 +83,9 @@ pub const RegisterName = enum(u5) {
 
 pub const Registers = struct {
     pc: u32 = 0xbfc00000, // Program Counter
-    r: [32]u32 = undefined, // FIXME does it have an initial value?
+    r_in: [32]u32 = undefined, // FIXME does it have an initial value?
+    r_out: [32]u32 = undefined, // FIXME does it have an initial value?
+    pending_load: ?struct { register: RegisterName, value: u32 } = null,
     sr: u32 = undefined,
 };
 
@@ -171,6 +173,12 @@ pub fn execute(psx: *PSXState) void {
         const instruction = next_instruction;
         const op_code = next_op_code;
 
+        // Execute any pending memory loads
+        if (psx.registers.pending_load) |pending_load| {
+            execution.store_reg(&psx.registers, pending_load.register, pending_load.value);
+            psx.registers.pending_load = null;
+        }
+
         next_op_code = load_mem_u32(psx, psx.registers.pc);
 
         next_instruction = instructions.decode_instruction(next_op_code);
@@ -181,6 +189,8 @@ pub fn execute(psx: *PSXState) void {
         debug.print_instruction(op_code, instruction);
 
         execution.execute_instruction(psx, instruction);
+
+        std.mem.copyForwards(u32, &psx.registers.r_in, &psx.registers.r_out);
     }
 }
 
