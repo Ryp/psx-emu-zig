@@ -29,6 +29,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .ori => |i| print_i_instruction("ori", i),
         .lui => |i| print_r_instruction("lui", i),
         .lw => |i| print_i_mem_instruction("lw", i),
+        .sh => |i| print_i_mem_instruction("sh", i),
         .sw => |i| print_i_mem_instruction("sw", i),
         .invalid => unreachable,
     }

@@ -26,6 +26,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .ori => |i| execute_ori(psx, i),
         .lui => |i| execute_lui(psx, i),
         .lw => |i| execute_lw(psx, i),
+        .sh => |i| execute_sh(psx, i),
         .sw => |i| execute_sw(psx, i),
         .invalid => unreachable,
     }
@@ -65,10 +66,9 @@ fn execute_addu(psx: *PSXState, instruction: instructions.addu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    _ = value_s;
-    _ = value_t;
-    unreachable;
-    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+    const result = value_s +% value_t;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_sub(psx: *PSXState, instruction: instructions.sub) void {
@@ -201,6 +201,16 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const value = cpu.load_mem_u32(psx, address);
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+}
+
+fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
+    const value = load_reg(psx.registers, instruction.rt);
+
+    const address_base = load_reg(psx.registers, instruction.rs);
+    // NOTE: using two's-complement to ignore signedness
+    const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
+
+    cpu.store_mem_u16(psx, address, @truncate(value));
 }
 
 fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
