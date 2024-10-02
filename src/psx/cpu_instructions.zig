@@ -71,20 +71,6 @@ pub const Instruction = union(enum) {
 pub fn decode_instruction(op_u32: u32) Instruction {
     const op: OpCodeHelper = @bitCast(op_u32);
 
-    const Cop0_Op = enum(u5) {
-        mtc0 = 0b00100,
-        _,
-    };
-
-    const Cop0 = packed struct {
-        _unused: u11,
-        rt: cpu.RegisterName,
-        rs: cpu.RegisterName,
-        op: Cop0_Op,
-        primary: PrimaryOpCode,
-    };
-    const op_cop0: Cop0 = @bitCast(op_u32);
-
     return switch (op.primary) {
         .SPECIAL => switch (op.b0_15.encoding_a.secondary) {
             .SLL => .{ .sll = .{ .rt = op.rt, .rd = op.b0_15.encoding_a.rd, .shift_imm = op.b0_15.encoding_a.imm5 } },
@@ -137,10 +123,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .ORI => .{ .ori = decode_generic_rs_rt_imm_u16(op_u32) },
         .XORI => unreachable,
         .LUI => .{ .lui = decode_generic_rt_imm_u16(op_u32) },
-        .COP0 => switch (op_cop0.op) {
-            .mtc0 => .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .cop_rt = @intFromEnum(op_cop0.rt) } },
-            else => unreachable,
-        },
+        .COP0 => decode_cop0_instruction(op_u32),
         .COP1 => unreachable,
         .COP2 => unreachable,
         .COP3 => unreachable,
@@ -256,6 +239,40 @@ const SecondaryOpCode = enum(u6) {
     _,
 };
 
+const Cop0 = packed struct {
+    _unused: u11,
+    rt: u5,
+    rs: cpu.RegisterName,
+    op: Cop0_Op,
+    primary: PrimaryOpCode,
+};
+
+const Cop0_Op = enum(u5) {
+    mtc0 = 0b00100,
+    _,
+};
+
+const Cop0_MTC0Target = enum(u5) {
+    BPC = 3,
+    BDA = 5,
+    Unknown = 6,
+    DCIC = 7,
+    BDAM = 9,
+    BPCM = 11,
+    SR = 12,
+    CAUSE = 13,
+    _,
+};
+
+fn decode_cop0_instruction(op_u32: u32) Instruction {
+    const op_cop0: Cop0 = @bitCast(op_u32);
+
+    switch (op_cop0.op) {
+        .mtc0 => return .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
+        else => unreachable,
+    }
+}
+
 pub const generic_rs_rt_imm_u16 = struct {
     rs: cpu.RegisterName,
     rt: cpu.RegisterName,
@@ -323,7 +340,7 @@ pub const sll = struct {
 
 pub const mtc0 = struct {
     cpu_rs: cpu.RegisterName,
-    cop_rt: u5,
+    target: Cop0_MTC0Target,
 };
 
 pub const add = generic_rs_rt_rd;

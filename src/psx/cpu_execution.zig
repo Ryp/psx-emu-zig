@@ -135,8 +135,17 @@ fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
 fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
     const value = load_reg(psx.registers, instruction.cpu_rs);
 
-    switch (instruction.cop_rt) {
-        12 => psx.registers.sr = value,
+    switch (instruction.target) {
+        .BPC, .BDA, .Unknown, .DCIC, .BDAM, .BPCM => {
+            std.debug.print("FIXME mtc0 target write ignored\n", .{});
+        },
+        .SR => psx.registers.sr = value,
+        .CAUSE => switch (value) {
+            0 => {
+                std.debug.print("FIXME mtc0 target write ignored\n", .{});
+            },
+            else => unreachable,
+        },
         else => unreachable,
     }
 }
