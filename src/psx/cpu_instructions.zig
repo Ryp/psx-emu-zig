@@ -120,7 +120,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
 
             .SLT => unreachable,
             .SLTU => unreachable,
-            else => unreachable,
+            _ => .{ .invalid = undefined },
         },
         .BcondZ => unreachable,
         .J => .{ .j = decode_generic_j(op_u32) },
@@ -164,7 +164,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .SWC1 => unreachable,
         .SWC2 => unreachable,
         .SWC3 => unreachable,
-        else => unreachable,
+        _ => .{ .invalid = undefined },
     };
 }
 
