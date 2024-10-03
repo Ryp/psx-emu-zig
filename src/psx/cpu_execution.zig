@@ -34,13 +34,19 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
 }
 
 fn load_reg(registers: Registers, register_name: cpu.RegisterName) u32 {
-    return switch (register_name) {
+    const value = switch (register_name) {
         .zero => 0,
         else => registers.r_in[@intFromEnum(register_name)],
     };
+
+    std.debug.print("reg load 0x{x:0>8} from {}\n", .{ value, register_name });
+
+    return value;
 }
 
 pub fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
+    std.debug.print("reg store 0x{x:0>8} in {}\n", .{ value, register_name });
+
     switch (register_name) {
         .zero => {},
         else => registers.r_out[@intFromEnum(register_name)] = value,

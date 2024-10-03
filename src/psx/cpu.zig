@@ -222,12 +222,10 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 }
 
 pub fn execute(psx: *PSXState) void {
-    const nop = instructions.decode_instruction(0);
-    var next_instruction = nop;
-    var next_op_code: u32 = 0;
+    const nop_op_code = 0;
+    var next_op_code: u32 = nop_op_code;
 
     while (true) {
-        const instruction = next_instruction;
         const op_code = next_op_code;
 
         // Execute any pending memory loads
@@ -238,10 +236,10 @@ pub fn execute(psx: *PSXState) void {
 
         next_op_code = load_mem_u32(psx, psx.registers.pc);
 
-        next_instruction = instructions.decode_instruction(next_op_code);
-
         // Execution is pipelined so we increment the PC before even starting to execute the current instruction
         psx.registers.pc +%= 4;
+
+        const instruction = instructions.decode_instruction(op_code);
 
         debug.print_instruction(op_code, instruction);
 
