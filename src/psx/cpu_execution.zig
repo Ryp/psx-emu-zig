@@ -24,7 +24,9 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
+        .andi => |i| execute_andi(psx, i),
         .ori => |i| execute_ori(psx, i),
+        .xori => |i| execute_xori(psx, i),
         .lui => |i| execute_lui(psx, i),
         .lw => |i| execute_lw(psx, i),
         .sh => |i| execute_sh(psx, i),
@@ -211,10 +213,22 @@ fn execute_addiu(psx: *PSXState, instruction: instructions.addiu) void {
     store_reg(&psx.registers, instruction.rt, result);
 }
 
+fn execute_andi(psx: *PSXState, instruction: instructions.andi) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    store_reg(&psx.registers, instruction.rt, value & instruction.imm_u16);
+}
+
 fn execute_ori(psx: *PSXState, instruction: instructions.ori) void {
     const value = load_reg(psx.registers, instruction.rs);
 
     store_reg(&psx.registers, instruction.rt, value | instruction.imm_u16);
+}
+
+fn execute_xori(psx: *PSXState, instruction: instructions.xori) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    store_reg(&psx.registers, instruction.rt, value ^ instruction.imm_u16);
 }
 
 fn execute_lui(psx: *PSXState, instruction: instructions.lui) void {
