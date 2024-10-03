@@ -59,21 +59,42 @@ fn execute_sll(psx: *PSXState, instruction: instructions.sll) void {
     store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
 }
 
+fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
+    _ = psx; // FIXME
+
+    // FIXME should we support negative overflow as well?
+    // NOTE: using two's-complement to ignore signedness
+    const result, const overflow = @addWithOverflow(lhs, @as(u32, @bitCast(rhs)));
+
+    if (overflow == 1) {
+        // FIXME Handle overflow exception
+        unreachable;
+    }
+
+    return result;
+}
+
+fn execute_generic_addu(psx: *PSXState, lhs: u32, rhs: i32) u32 {
+    _ = psx; // FIXME
+
+    // NOTE: using two's-complement to ignore signedness
+    return lhs +% @as(u32, @bitCast(rhs));
+}
+
 fn execute_add(psx: *PSXState, instruction: instructions.add) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    _ = value_s;
-    _ = value_t;
-    unreachable;
-    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+    const result = execute_generic_add(psx, value_s, @bitCast(value_t));
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_addu(psx: *PSXState, instruction: instructions.addu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    const result = value_s +% value_t;
+    const result = execute_generic_addu(psx, value_s, @bitCast(value_t));
 
     store_reg(&psx.registers, instruction.rd, result);
 }
@@ -175,23 +196,19 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
 }
 
 fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
-    const value = load_reg(psx.registers, instruction.rs);
+    const value_s = load_reg(psx.registers, instruction.rs);
 
-    // FIXME should we support negative overflow as well?
-    const result, const overflow = @addWithOverflow(value, instruction.imm_u16);
-
-    if (overflow == 1) {
-        // FIXME Handle overflow exception
-        unreachable;
-    }
+    const result = execute_generic_add(psx, value_s, @as(i16, @bitCast(instruction.imm_u16)));
 
     store_reg(&psx.registers, instruction.rt, result);
 }
 
 fn execute_addiu(psx: *PSXState, instruction: instructions.addiu) void {
-    const value = load_reg(psx.registers, instruction.rs);
+    const value_s = load_reg(psx.registers, instruction.rs);
 
-    store_reg(&psx.registers, instruction.rt, value +% instruction.imm_u16);
+    const result = execute_generic_addu(psx, value_s, @as(i16, @bitCast(instruction.imm_u16)));
+
+    store_reg(&psx.registers, instruction.rt, result);
 }
 
 fn execute_ori(psx: *PSXState, instruction: instructions.ori) void {
