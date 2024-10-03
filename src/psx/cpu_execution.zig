@@ -19,6 +19,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .slt => unreachable,
         .sltu => |i| execute_sltu(psx, i),
         .j => |i| execute_j(psx, i),
+        .jal => |i| execute_jal(psx, i),
         .bne => |i| execute_bne(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
@@ -129,6 +130,12 @@ fn execute_sltu(psx: *PSXState, instruction: instructions.nor) void {
 }
 
 fn execute_j(psx: *PSXState, instruction: instructions.j) void {
+    psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
+}
+
+fn execute_jal(psx: *PSXState, instruction: instructions.j) void {
+    store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.pc);
+
     psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
 }
 
