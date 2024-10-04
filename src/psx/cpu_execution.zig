@@ -21,6 +21,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .sltu => |i| execute_sltu(psx, i),
         .j => |i| execute_j(psx, i),
         .jal => |i| execute_jal(psx, i),
+        .beq => |i| execute_beq(psx, i),
         .bne => |i| execute_bne(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
@@ -187,13 +188,26 @@ fn execute_jal(psx: *PSXState, instruction: instructions.jal) void {
     psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
 }
 
+fn execute_branch(psx: *PSXState, offset: i32) void {
+    psx.registers.pc = wrapping_add_u32_i32(psx.registers.pc, offset);
+    psx.registers.pc -%= 4;
+}
+
+fn execute_beq(psx: *PSXState, instruction: instructions.beq) void {
+    const value_s = load_reg(psx.registers, instruction.rs);
+    const value_t = load_reg(psx.registers, instruction.rt);
+
+    if (value_s == value_t) {
+        execute_branch(psx, instruction.rel_offset);
+    }
+}
+
 fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
     if (value_s != value_t) {
-        psx.registers.pc = wrapping_add_u32_i32(psx.registers.pc, instruction.rel_offset);
-        psx.registers.pc -%= 4;
+        execute_branch(psx, instruction.rel_offset);
     }
 }
 

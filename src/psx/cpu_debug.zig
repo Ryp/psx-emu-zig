@@ -23,7 +23,8 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
 
         .j => |i| print_j_instruction("j", i),
         .jal => |i| print_j_instruction("jal", i),
-        .bne => |i| print_bne_instruction(i),
+        .beq => |i| print_branch_instruction("beq", i),
+        .bne => |i| print_branch_instruction("bne", i),
 
         .mtc0 => |i| print_mtc0_instruction(i),
         .addi => |i| print_i_instruction("addi", i),
@@ -65,8 +66,8 @@ fn print_j_instruction(op_name: [:0]const u8, instruction: instructions.generic_
     std.debug.print("{s} 0x{x:0>8}\n", .{ op_name, instruction.offset });
 }
 
-fn print_bne_instruction(instruction: instructions.bne) void {
-    std.debug.print("bne ${}, ${}, {}\n", .{ instruction.rt, instruction.rs, instruction.rel_offset });
+fn print_branch_instruction(op_name: [:0]const u8, instruction: instructions.generic_branch) void {
+    std.debug.print("{s} ${}, ${}, {}\n", .{ op_name, instruction.rt, instruction.rs, instruction.rel_offset });
 }
 
 fn print_sll_instruction(instruction: instructions.sll) void {
