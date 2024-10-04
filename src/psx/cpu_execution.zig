@@ -31,6 +31,8 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
+        .slti => |i| execute_slti(psx, i),
+        .sltiu => |i| execute_sltiu(psx, i),
         .andi => |i| execute_andi(psx, i),
         .ori => |i| execute_ori(psx, i),
         .xori => |i| execute_xori(psx, i),
@@ -275,6 +277,20 @@ fn execute_addiu(psx: *PSXState, instruction: instructions.addiu) void {
     const result = wrapping_add_u32_i32(value_s, instruction.imm_i16);
 
     store_reg(&psx.registers, instruction.rt, result);
+}
+
+fn execute_slti(psx: *PSXState, instruction: instructions.slti) void {
+    const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
+
+    const result: u32 = if (value_s < instruction.imm_i16) 1 else 0;
+
+    store_reg(&psx.registers, instruction.rt, result);
+}
+
+fn execute_sltiu(psx: *PSXState, instruction: instructions.sltiu) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_andi(psx: *PSXState, instruction: instructions.andi) void {

@@ -71,6 +71,8 @@ pub const Instruction = union(enum) {
     mtc0: mtc0,
     addi: addi,
     addiu: addiu,
+    slti: slti,
+    sltiu: sltiu,
     andi: andi,
     ori: ori,
     xori: xori,
@@ -136,8 +138,8 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .BGTZ => .{ .bgtz = decode_generic_branch_2(op_u32) },
         .ADDI => .{ .addi = decode_generic_rs_rt_imm_i16(op_u32) },
         .ADDIU => .{ .addiu = decode_generic_rs_rt_imm_i16(op_u32) },
-        .SLTI => unreachable,
-        .SLTIU => unreachable,
+        .SLTI => .{ .slti = decode_generic_rs_rt_imm_i16(op_u32) },
+        .SLTIU => .{ .sltiu = decode_generic_rs_rt_imm_i16(op_u32) },
         .ANDI => .{ .andi = decode_generic_rs_rt_imm_u16(op_u32) },
         .ORI => .{ .ori = decode_generic_rs_rt_imm_u16(op_u32) },
         .XORI => .{ .xori = decode_generic_rs_rt_imm_u16(op_u32) },
@@ -449,6 +451,8 @@ pub const slt = generic_rs_rt_rd;
 pub const sltu = generic_rs_rt_rd;
 pub const addi = generic_rs_rt_imm_i16;
 pub const addiu = generic_rs_rt_imm_i16;
+pub const slti = generic_rs_rt_imm_i16;
+pub const sltiu = generic_rs_rt_imm_i16;
 pub const andi = generic_rs_rt_imm_u16;
 pub const ori = generic_rs_rt_imm_u16;
 pub const xori = generic_rs_rt_imm_u16;
