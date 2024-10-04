@@ -9,6 +9,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
         .jr => |i| execute_jr(psx, i),
+        .jalr => |i| execute_jalr(psx, i),
         .add => |i| execute_add(psx, i),
         .addu => |i| execute_addu(psx, i),
         .sub => |i| execute_sub(psx, i),
@@ -75,9 +76,13 @@ fn execute_sll(psx: *PSXState, instruction: instructions.sll) void {
 }
 
 fn execute_jr(psx: *PSXState, instruction: instructions.jr) void {
-    const value = load_reg(psx.registers, instruction.rs);
+    psx.registers.pc = load_reg(psx.registers, instruction.rs);
+}
 
-    psx.registers.pc = value;
+fn execute_jalr(psx: *PSXState, instruction: instructions.jalr) void {
+    store_reg(&psx.registers, instruction.rd, psx.registers.pc);
+
+    psx.registers.pc = load_reg(psx.registers, instruction.rs);
 }
 
 fn execute_add(psx: *PSXState, instruction: instructions.add) void {
