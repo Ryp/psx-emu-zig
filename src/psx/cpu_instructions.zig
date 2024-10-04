@@ -438,5 +438,5 @@ pub const lw = generic_rs_rt_imm_i16;
 pub const lbu = generic_rs_rt_imm_i16;
 pub const sb = generic_rs_rt_imm_i16;
 pub const sh = generic_rs_rt_imm_i16;
-pub const sw = generic_rs_rt_imm_i16;
 pub const swl = generic_rs_rt_imm_i16;
+pub const sw = generic_rs_rt_imm_i16;
