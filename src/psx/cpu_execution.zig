@@ -68,6 +68,12 @@ fn execute_sll(psx: *PSXState, instruction: instructions.sll) void {
     store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
 }
 
+fn execute_jr(psx: *PSXState, instruction: instructions.jr) void {
+    const value = load_reg(psx.registers, instruction.rs);
+
+    psx.registers.pc = value;
+}
+
 fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
     _ = psx; // FIXME
 

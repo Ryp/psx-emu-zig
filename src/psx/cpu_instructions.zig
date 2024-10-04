@@ -48,6 +48,7 @@ const OpCodeHelper = packed struct {
 
 pub const Instruction = union(enum) {
     sll: sll,
+    jr: jr,
     add: add,
     addu: addu,
     sub: sub,
@@ -91,7 +92,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .SRLV => unreachable,
             .SRAV => unreachable,
 
-            .JR => unreachable,
+            .JR => .{ .rs = op.rs },
             .JALR => unreachable,
             .SYSCALL => unreachable,
             .BREAK => unreachable,
@@ -331,6 +332,10 @@ pub const generic_j = struct {
     offset: u28,
 };
 
+pub const generic_jr = struct {
+    rs: cpu.RegisterName,
+};
+
 fn decode_generic_j(op_u32: u32) generic_j {
     return .{ .offset = @as(u28, @as(u26, @truncate(op_u32))) << 2 };
 }
@@ -349,6 +354,8 @@ pub const sll = struct {
     rd: cpu.RegisterName,
     shift_imm: u5,
 };
+
+pub const jr = generic_jr;
 
 pub const mtc0 = struct {
     cpu_rs: cpu.RegisterName,

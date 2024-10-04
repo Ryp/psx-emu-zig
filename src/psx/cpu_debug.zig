@@ -8,6 +8,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
 
     switch (instruction) {
         .sll => |i| print_sll_instruction(i),
+        .jr => |i| print_jr_instruction(i),
 
         .add => |i| print_ralu_instruction("add", i),
         .addu => |i| print_ralu_instruction("addu", i),
@@ -54,6 +55,10 @@ fn print_i_mem_instruction(op_name: [:0]const u8, instruction: instructions.gene
 
 fn print_r_instruction(op_name: [:0]const u8, instruction: instructions.generic_rt_imm_u16) void {
     std.debug.print("{s} ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.imm_u16 });
+}
+
+fn print_jr_instruction(instruction: instructions.generic_jr) void {
+    std.debug.print("jr ${}\n", .{instruction.rs});
 }
 
 fn print_j_instruction(op_name: [:0]const u8, instruction: instructions.generic_j) void {
