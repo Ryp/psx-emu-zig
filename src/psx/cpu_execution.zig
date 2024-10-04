@@ -28,9 +28,16 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .ori => |i| execute_ori(psx, i),
         .xori => |i| execute_xori(psx, i),
         .lui => |i| execute_lui(psx, i),
+
+        .lb => |i| execute_lb(psx, i),
+        .lh => |i| execute_lh(psx, i),
+        .lwl => |i| execute_lwl(psx, i),
         .lw => |i| execute_lw(psx, i),
+        .sb => |i| execute_sb(psx, i),
         .sh => |i| execute_sh(psx, i),
+        .swl => |i| execute_swl(psx, i),
         .sw => |i| execute_sw(psx, i),
+
         .invalid => unreachable,
     }
 }
@@ -237,6 +244,24 @@ fn execute_lui(psx: *PSXState, instruction: instructions.lui) void {
     store_reg(&psx.registers, instruction.rt, value);
 }
 
+fn execute_lb(psx: *PSXState, instruction: instructions.lb) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_lh(psx: *PSXState, instruction: instructions.lh) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
 fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     // NOTE: using two's-complement to ignore signedness
@@ -247,6 +272,12 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
 }
 
+fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
 fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     const value = load_reg(psx.registers, instruction.rt);
 
@@ -255,6 +286,12 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
 
     cpu.store_mem_u16(psx, address, @truncate(value));
+}
+
+fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {

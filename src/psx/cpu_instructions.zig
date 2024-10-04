@@ -68,8 +68,13 @@ pub const Instruction = union(enum) {
     ori: ori,
     xori: xori,
     lui: lui,
+    lb: lb,
+    lh: lh,
+    lwl: lwl,
     lw: lw,
+    sb: sb,
     sh: sh,
+    swl: swl,
     sw: sw,
     invalid,
 };
@@ -133,16 +138,16 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .COP1 => unreachable,
         .COP2 => unreachable,
         .COP3 => unreachable,
-        .LB => unreachable,
-        .LH => unreachable,
-        .LWL => unreachable,
+        .LB => .{ .lb = decode_generic_rs_rt_imm_i16(op_u32) },
+        .LH => .{ .lh = decode_generic_rs_rt_imm_i16(op_u32) },
+        .LWL => .{ .lwl = decode_generic_rs_rt_imm_i16(op_u32) },
         .LW => .{ .lw = decode_generic_rs_rt_imm_i16(op_u32) },
         .LBU => unreachable,
         .LHU => unreachable,
         .LWR => unreachable,
-        .SB => unreachable,
+        .SB => .{ .sb = decode_generic_rs_rt_imm_i16(op_u32) },
         .SH => .{ .sh = decode_generic_rs_rt_imm_i16(op_u32) },
-        .SWL => unreachable,
+        .SWL => .{ .swl = decode_generic_rs_rt_imm_i16(op_u32) },
         .SW => .{ .sw = decode_generic_rs_rt_imm_i16(op_u32) },
         .SWR => unreachable,
         .LWC0 => unreachable,
@@ -366,6 +371,11 @@ pub const andi = generic_rs_rt_imm_u16;
 pub const ori = generic_rs_rt_imm_u16;
 pub const xori = generic_rs_rt_imm_u16;
 pub const lui = generic_rt_imm_u16;
+pub const lb = generic_rs_rt_imm_i16;
+pub const lh = generic_rs_rt_imm_i16;
+pub const lwl = generic_rs_rt_imm_i16;
 pub const lw = generic_rs_rt_imm_i16;
+pub const sb = generic_rs_rt_imm_i16;
 pub const sh = generic_rs_rt_imm_i16;
 pub const sw = generic_rs_rt_imm_i16;
+pub const swl = generic_rs_rt_imm_i16;
