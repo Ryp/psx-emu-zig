@@ -86,8 +86,7 @@ fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
 fn execute_generic_addu(psx: *PSXState, lhs: u32, rhs: i32) u32 {
     _ = psx; // FIXME
 
-    // NOTE: using two's-complement to ignore signedness
-    return lhs +% @as(u32, @bitCast(rhs));
+    return wrapping_add_u32_i32(lhs, rhs);
 }
 
 fn execute_add(psx: *PSXState, instruction: instructions.add) void {
@@ -180,8 +179,7 @@ fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
     const value_t = load_reg(psx.registers, instruction.rt);
 
     if (value_s != value_t) {
-        // NOTE: using two's-complement to ignore signedness
-        psx.registers.pc +%= @as(u32, @bitCast(@as(i32, instruction.rel_offset)));
+        psx.registers.pc = wrapping_add_u32_i32(psx.registers.pc, instruction.rel_offset);
         psx.registers.pc -%= 4;
     }
 }
@@ -264,8 +262,7 @@ fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
 
 fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address_base = load_reg(psx.registers, instruction.rs);
-    // NOTE: using two's-complement to ignore signedness
-    const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     const value = cpu.load_mem_u32(psx, address);
 
@@ -282,8 +279,7 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     const value = load_reg(psx.registers, instruction.rt);
 
     const address_base = load_reg(psx.registers, instruction.rs);
-    // NOTE: using two's-complement to ignore signedness
-    const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     cpu.store_mem_u16(psx, address, @truncate(value));
 }
@@ -298,8 +294,12 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const value = load_reg(psx.registers, instruction.rt);
 
     const address_base = load_reg(psx.registers, instruction.rs);
-    // NOTE: using two's-complement to ignore signedness
-    const address = address_base +% @as(u32, @bitCast(@as(i32, instruction.imm_i16)));
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     cpu.store_mem_u32(psx, address, value);
+}
+
+fn wrapping_add_u32_i32(lhs: u32, rhs: i32) u32 {
+    // NOTE: using two's-complement to ignore signedness
+    return lhs +% @as(u32, @bitCast(rhs));
 }
