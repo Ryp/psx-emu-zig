@@ -23,6 +23,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .jal => |i| execute_jal(psx, i),
         .beq => |i| execute_beq(psx, i),
         .bne => |i| execute_bne(psx, i),
+        .mfc0 => |i| execute_mfc0(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
@@ -209,6 +210,16 @@ fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
     if (value_s != value_t) {
         execute_branch(psx, instruction.rel_offset);
     }
+}
+
+fn execute_mfc0(psx: *PSXState, instruction: instructions.mtc0) void {
+    const value = switch (instruction.target) {
+        .BPC, .BDA, .Unknown, .DCIC, .BDAM, .BPCM, .CAUSE => unreachable,
+        .SR => psx.registers.sr,
+        else => unreachable,
+    };
+
+    psx.registers.pending_load = .{ .register = instruction.cpu_rs, .value = @bitCast(value) };
 }
 
 fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {

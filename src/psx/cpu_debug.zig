@@ -26,6 +26,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .beq => |i| print_branch_instruction("beq", i),
         .bne => |i| print_branch_instruction("bne", i),
 
+        .mfc0 => |i| print_mfc0_instruction(i),
         .mtc0 => |i| print_mtc0_instruction(i),
         .addi => |i| print_i_instruction("addi", i),
         .addiu => |i| print_i_instruction("addiu", i),
@@ -80,6 +81,14 @@ fn print_sll_instruction(instruction: instructions.sll) void {
 
 fn print_ralu_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_rd) void {
     std.debug.print("{s} ${}, ${}, ${}\n", .{ op_name, instruction.rd, instruction.rt, instruction.rs });
+}
+
+fn print_mfc0_instruction(instruction: instructions.mfc0) void {
+    switch (instruction.target) {
+        else => {
+            std.debug.print("mfc0 ${}, {}\n", .{ instruction.cpu_rs, instruction.target });
+        },
+    }
 }
 
 fn print_mtc0_instruction(instruction: instructions.mtc0) void {

@@ -63,6 +63,7 @@ pub const Instruction = union(enum) {
     jal: jal,
     beq: beq,
     bne: bne,
+    mfc0: mfc0,
     mtc0: mtc0,
     addi: addi,
     addiu: addiu,
@@ -252,8 +253,29 @@ const SecondaryOpCode = enum(u6) {
     _,
 };
 
+// Coprocessor Opcode/Parameter Encoding
+//
+//   31..26 |25..21|20..16|15..11|10..6 |  5..0  |
+//    6bit  | 5bit | 5bit | 5bit | 5bit |  6bit  |
+//   -------+------+------+------+------+--------+------------
+//   0100nn |0|0000| rt   | rd   | N/A  | 000000 | MFCn rt,rd_dat  ;rt = dat
+//   0100nn |0|0010| rt   | rd   | N/A  | 000000 | CFCn rt,rd_cnt  ;rt = cnt
+//   0100nn |0|0100| rt   | rd   | N/A  | 000000 | MTCn rt,rd_dat  ;dat = rt
+//   0100nn |0|0110| rt   | rd   | N/A  | 000000 | CTCn rt,rd_cnt  ;cnt = rt
+//   0100nn |0|1000|00000 | <--immediate16bit--> | BCnF target ;jump if false
+//   0100nn |0|1000|00001 | <--immediate16bit--> | BCnT target ;jump if true
+//   0100nn |1| <--------immediate25bit--------> | COPn imm25
+//   010000 |1|0000| N/A  | N/A  | N/A  | 000001 | COP0 01h  ;=TLBR   ;\if any
+//   010000 |1|0000| N/A  | N/A  | N/A  | 000010 | COP0 02h  ;=TLBWI  ; (not on
+//   010000 |1|0000| N/A  | N/A  | N/A  | 000110 | COP0 06h  ;=TLBWR  ; psx)
+//   010000 |1|0000| N/A  | N/A  | N/A  | 001000 | COP0 08h  ;=TLBP   ;/
+//   010000 |1|0000| N/A  | N/A  | N/A  | 010000 | COP0 10h  ;=RFE
+//   1100nn | rs   | rt   | <--immediate16bit--> | LWCn rt_dat,[rs+imm]
+//   1110nn | rs   | rt   | <--immediate16bit--> | SWCn rt_dat,[rs+imm]
+
 const Cop0 = packed struct {
-    _unused: u11,
+    _unused: u6,
+    rd: u5,
     rt: u5,
     rs: cpu.RegisterName,
     op: Cop0_Op,
@@ -261,6 +283,7 @@ const Cop0 = packed struct {
 };
 
 const Cop0_Op = enum(u5) {
+    mfc0 = 0b00000,
     mtc0 = 0b00100,
     _,
 };
@@ -281,6 +304,7 @@ fn decode_cop0_instruction(op_u32: u32) Instruction {
     const op_cop0: Cop0 = @bitCast(op_u32);
 
     switch (op_cop0.op) {
+        .mfc0 => return .{ .mfc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
         .mtc0 => return .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
         else => unreachable,
     }
@@ -370,6 +394,7 @@ pub const mtc0 = struct {
     cpu_rs: cpu.RegisterName,
     target: Cop0_MTC0Target,
 };
+pub const mfc0 = mtc0;
 
 pub const add = generic_rs_rt_rd;
 pub const addu = generic_rs_rt_rd;
