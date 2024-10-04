@@ -31,6 +31,8 @@ const HWRegs_SPU_SizeBytes = 640;
 const HWRegs_SPU_Offset = 0x1f801c00;
 const HWRegs_SPU_OffsetEnd = HWRegs_SPU_Offset + HWRegs_SPU_SizeBytes;
 
+const HWRegs_InterruptStatus_Offset = 0x1f801070;
+const HWRegs_InterruptMask_Offset = 0x1f801074;
 const HWRegs_UnknownDebug_Offset = 0x1f802041;
 
 // 0x1fc00000 0x9fc00000 0xbfc00000 512K BIOS ROM
@@ -275,6 +277,9 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
                         .Expansion1BaseAddress, .Expansion2BaseAddress => {
                             std.debug.print("FIXME store ignored to expansion register 0x{x:0>8}\n", .{local_offset});
                         },
+                        .InterruptStatus, .InterruptMask => {
+                            std.debug.print("FIXME store ignored to IRQ register 0x{x:0>8}\n", .{local_offset});
+                        },
                         else => {
                             std.debug.print("FIXME store ignored at local offset 0x{x:0>8}\n", .{local_offset});
                         },
@@ -326,5 +331,7 @@ pub fn execute(psx: *PSXState) void {
 const HWRegOffsets = enum(u13) {
     Expansion1BaseAddress = 0,
     Expansion2BaseAddress = 4,
+    InterruptStatus = HWRegs_InterruptStatus_Offset - HWRegs_Offset,
+    InterruptMask = HWRegs_InterruptMask_Offset - HWRegs_Offset,
     _,
 };
