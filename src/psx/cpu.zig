@@ -110,6 +110,29 @@ const PSXAddress = packed struct {
     },
 };
 
+pub fn load_mem_u8(psx: *PSXState, address_u32: u32) u8 {
+    std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
+
+    const address: PSXAddress = @bitCast(address_u32);
+
+    switch (address.mapping) {
+        .Useg, .Seg0, .Seg1 => {
+            switch (address.offset) {
+                RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - RAM_Offset;
+                    return psx.ram[local_offset];
+                },
+                BIOS_Offset...BIOS_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - BIOS_Offset;
+                    return psx.bios[local_offset];
+                },
+                else => unreachable,
+            }
+        },
+        .Seg2 => unreachable,
+    }
+}
+
 pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
     std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
 
@@ -147,8 +170,6 @@ pub fn store_mem_u8(psx: *PSXState, address_u32: u32, value: u8) void {
     }
 
     const address: PSXAddress = @bitCast(address_u32);
-
-    std.debug.assert(address.offset % 1 == 0); // FIXME implement bus errors
 
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {

@@ -256,9 +256,13 @@ fn execute_lui(psx: *PSXState, instruction: instructions.lui) void {
 }
 
 fn execute_lb(psx: *PSXState, instruction: instructions.lb) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+
+    const value: i8 = @bitCast(cpu.load_mem_u8(psx, address));
+    const value_sign_extended: i32 = value;
+
+    psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
 }
 
 fn execute_lh(psx: *PSXState, instruction: instructions.lh) void {
