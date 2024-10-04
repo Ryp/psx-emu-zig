@@ -40,6 +40,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .lh => |i| print_i_mem_instruction("lh", i),
         .lwl => |i| print_i_mem_instruction("lwl", i),
         .lw => |i| print_i_mem_instruction("lw", i),
+        .lbu => |i| print_i_mem_instruction("lbu", i),
         .sb => |i| print_i_mem_instruction("sb", i),
         .sh => |i| print_i_mem_instruction("sh", i),
         .swl => |i| print_i_mem_instruction("swl", i),

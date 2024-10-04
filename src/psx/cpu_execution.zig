@@ -38,6 +38,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .lh => |i| execute_lh(psx, i),
         .lwl => |i| execute_lwl(psx, i),
         .lw => |i| execute_lw(psx, i),
+        .lbu => |i| execute_lbu(psx, i),
         .sb => |i| execute_sb(psx, i),
         .sh => |i| execute_sh(psx, i),
         .swl => |i| execute_swl(psx, i),
@@ -304,6 +305,15 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     const value = cpu.load_mem_u32(psx, address);
+
+    psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+}
+
+fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+
+    const value: u8 = cpu.load_mem_u8(psx, address);
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
 }

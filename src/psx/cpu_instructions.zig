@@ -77,6 +77,7 @@ pub const Instruction = union(enum) {
     lh: lh,
     lwl: lwl,
     lw: lw,
+    lbu: lbu,
     sb: sb,
     sh: sh,
     swl: swl,
@@ -147,7 +148,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .LH => .{ .lh = decode_generic_rs_rt_imm_i16(op_u32) },
         .LWL => .{ .lwl = decode_generic_rs_rt_imm_i16(op_u32) },
         .LW => .{ .lw = decode_generic_rs_rt_imm_i16(op_u32) },
-        .LBU => unreachable,
+        .LBU => .{ .lbu = decode_generic_rs_rt_imm_i16(op_u32) },
         .LHU => unreachable,
         .LWR => unreachable,
         .SB => .{ .sb = decode_generic_rs_rt_imm_i16(op_u32) },
@@ -430,6 +431,7 @@ pub const lb = generic_rs_rt_imm_i16;
 pub const lh = generic_rs_rt_imm_i16;
 pub const lwl = generic_rs_rt_imm_i16;
 pub const lw = generic_rs_rt_imm_i16;
+pub const lbu = generic_rs_rt_imm_i16;
 pub const sb = generic_rs_rt_imm_i16;
 pub const sh = generic_rs_rt_imm_i16;
 pub const sw = generic_rs_rt_imm_i16;
