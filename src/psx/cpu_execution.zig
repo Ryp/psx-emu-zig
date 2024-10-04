@@ -101,7 +101,7 @@ fn execute_addu(psx: *PSXState, instruction: instructions.addu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    const result = wrapping_add_u32_i32(value_s, @bitCast(value_t));
+    const result = value_s +% value_t;
 
     store_reg(&psx.registers, instruction.rd, result);
 }
@@ -120,10 +120,9 @@ fn execute_subu(psx: *PSXState, instruction: instructions.subu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    _ = value_s;
-    _ = value_t;
-    unreachable;
-    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+    const result = value_s -% value_t;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_and(psx: *PSXState, instruction: instructions.and_) void {
