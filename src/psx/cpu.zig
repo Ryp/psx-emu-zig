@@ -15,6 +15,8 @@ const Expansion_SizeBytes = 8 * 1024 * 1024;
 const Expansion_Offset = 0x1f000000;
 const Expansion_OffsetEnd = Expansion_Offset + Expansion_SizeBytes;
 
+const Expansion_ParallelPortOffset = 0x1f00_0084;
+
 // 0x1f800000 0x9f800000 0xbf800000 1K Scratchpad
 const Scratchpad_SizeBytes = 1024;
 const Scratchpad_Offset = 0x1f800000;
@@ -122,6 +124,10 @@ pub fn load_mem_u8(psx: *PSXState, address_u32: u32) u8 {
                     const local_offset = offset - RAM_Offset;
                     return psx.ram[local_offset];
                 },
+                Expansion_Offset...Expansion_OffsetEnd - 1 => |offset| switch (offset) {
+                    Expansion_ParallelPortOffset => return 0xff,
+                    else => unreachable,
+                },
                 BIOS_Offset...BIOS_OffsetEnd - 1 => |offset| {
                     const local_offset = offset - BIOS_Offset;
                     return psx.bios[local_offset];
@@ -174,6 +180,10 @@ pub fn store_mem_u8(psx: *PSXState, address_u32: u32, value: u8) void {
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
             switch (address.offset) {
+                RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - RAM_Offset;
+                    psx.ram[local_offset] = value;
+                },
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     switch (offset) {
                         HWRegs_UnknownDebug_Offset => {
@@ -256,7 +266,7 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
                 RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
                     const local_offset = offset - RAM_Offset;
                     const u32_slice = psx.ram[local_offset..];
-                    return std.mem.writeInt(u32, u32_slice[0..4], value, .little);
+                    std.mem.writeInt(u32, u32_slice[0..4], value, .little);
                 },
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     const local_offset: u13 = @intCast(offset - HWRegs_Offset);
