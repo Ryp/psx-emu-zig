@@ -92,7 +92,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .SRLV => unreachable,
             .SRAV => unreachable,
 
-            .JR => .{ .rs = op.rs },
+            .JR => .{ .jr = .{ .rs = op.rs } },
             .JALR => unreachable,
             .SYSCALL => unreachable,
             .BREAK => unreachable,

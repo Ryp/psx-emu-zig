@@ -8,6 +8,7 @@ const Registers = cpu.Registers;
 pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) void {
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
+        .jr => |i| execute_jr(psx, i),
         .add => |i| execute_add(psx, i),
         .addu => |i| execute_addu(psx, i),
         .sub => |i| execute_sub(psx, i),
@@ -161,7 +162,13 @@ fn execute_nor(psx: *PSXState, instruction: instructions.nor) void {
     store_reg(&psx.registers, instruction.rd, ~(value_s | value_t));
 }
 
-fn execute_sltu(psx: *PSXState, instruction: instructions.nor) void {
+fn execute_slt(psx: *PSXState, instruction: instructions.slt) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_sltu(psx: *PSXState, instruction: instructions.sltu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
@@ -174,7 +181,7 @@ fn execute_j(psx: *PSXState, instruction: instructions.j) void {
     psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
 }
 
-fn execute_jal(psx: *PSXState, instruction: instructions.j) void {
+fn execute_jal(psx: *PSXState, instruction: instructions.jal) void {
     store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.pc);
 
     psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
