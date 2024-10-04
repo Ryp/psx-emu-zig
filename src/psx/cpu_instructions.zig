@@ -63,6 +63,8 @@ pub const Instruction = union(enum) {
     jal: jal,
     beq: beq,
     bne: bne,
+    blez: blez,
+    bgtz: bgtz,
     mfc0: mfc0,
     mtc0: mtc0,
     addi: addi,
@@ -127,8 +129,8 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .JAL => .{ .jal = decode_generic_j(op_u32) },
         .BEQ => .{ .beq = decode_generic_branch(op_u32) },
         .BNE => .{ .bne = decode_generic_branch(op_u32) },
-        .BLEZ => unreachable,
-        .BGTZ => unreachable,
+        .BLEZ => .{ .blez = decode_generic_branch_2(op_u32) },
+        .BGTZ => .{ .bgtz = decode_generic_branch_2(op_u32) },
         .ADDI => .{ .addi = decode_generic_rs_rt_imm_i16(op_u32) },
         .ADDIU => .{ .addiu = decode_generic_rs_rt_imm_i16(op_u32) },
         .SLTI => unreachable,
@@ -332,16 +334,6 @@ fn decode_generic_rs_rt_rd(op_u32: u32) generic_rs_rt_rd {
     return .{ .rs = op.rs, .rt = op.rt, .rd = op.b0_15.encoding_a.rd };
 }
 
-pub const generic_rt_imm_u16 = struct {
-    rt: cpu.RegisterName,
-    imm_u16: u16,
-};
-
-fn decode_generic_rt_imm_u16(op_u32: u32) generic_rt_imm_u16 {
-    const op: OpCodeHelper = @bitCast(op_u32);
-    return .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 };
-}
-
 pub const generic_rs_rt_imm_i16 = struct {
     rs: cpu.RegisterName,
     rt: cpu.RegisterName,
@@ -351,6 +343,16 @@ pub const generic_rs_rt_imm_i16 = struct {
 fn decode_generic_rs_rt_imm_i16(op_u32: u32) generic_rs_rt_imm_i16 {
     const op: OpCodeHelper = @bitCast(op_u32);
     return .{ .rs = op.rs, .rt = op.rt, .imm_i16 = @bitCast(op.b0_15.encoding_b.imm16) };
+}
+
+pub const generic_rt_imm_u16 = struct {
+    rt: cpu.RegisterName,
+    imm_u16: u16,
+};
+
+fn decode_generic_rt_imm_u16(op_u32: u32) generic_rt_imm_u16 {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 };
 }
 
 pub const generic_j = struct {
@@ -379,8 +381,20 @@ fn decode_generic_branch(op_u32: u32) generic_branch {
     return .{ .rs = op.rs, .rt = op.rt, .rel_offset = @bitCast(@as(u18, op.b0_15.encoding_b.imm16) << 2) };
 }
 
+pub const generic_branch_2 = struct {
+    rs: cpu.RegisterName,
+    rel_offset: i18,
+};
+
+fn decode_generic_branch_2(op_u32: u32) generic_branch_2 {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rs = op.rs, .rel_offset = @bitCast(@as(u18, op.b0_15.encoding_b.imm16) << 2) };
+}
+
 pub const beq = generic_branch;
 pub const bne = generic_branch;
+pub const blez = generic_branch_2;
+pub const bgtz = generic_branch_2;
 
 pub const sll = struct {
     rt: cpu.RegisterName,

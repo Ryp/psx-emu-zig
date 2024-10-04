@@ -23,6 +23,8 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .jal => |i| execute_jal(psx, i),
         .beq => |i| execute_beq(psx, i),
         .bne => |i| execute_bne(psx, i),
+        .blez => |i| execute_blez(psx, i),
+        .bgtz => |i| execute_bgtz(psx, i),
         .mfc0 => |i| execute_mfc0(psx, i),
         .mtc0 => |i| execute_mtc0(psx, i),
         .addi => |i| execute_addi(psx, i),
@@ -187,6 +189,22 @@ fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
     const value_t = load_reg(psx.registers, instruction.rt);
 
     if (value_s != value_t) {
+        execute_branch(psx, instruction.rel_offset);
+    }
+}
+
+fn execute_blez(psx: *PSXState, instruction: instructions.blez) void {
+    const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
+
+    if (value_s <= 0) {
+        execute_branch(psx, instruction.rel_offset);
+    }
+}
+
+fn execute_bgtz(psx: *PSXState, instruction: instructions.bgtz) void {
+    const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
+
+    if (value_s > 0) {
         execute_branch(psx, instruction.rel_offset);
     }
 }
