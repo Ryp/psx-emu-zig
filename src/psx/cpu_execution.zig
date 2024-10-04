@@ -77,27 +77,6 @@ fn execute_jr(psx: *PSXState, instruction: instructions.jr) void {
     psx.registers.pc = value;
 }
 
-fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
-    _ = psx; // FIXME
-
-    // FIXME should we support negative overflow as well?
-    // NOTE: using two's-complement to ignore signedness
-    const result, const overflow = @addWithOverflow(lhs, @as(u32, @bitCast(rhs)));
-
-    if (overflow == 1) {
-        // FIXME Handle overflow exception
-        unreachable;
-    }
-
-    return result;
-}
-
-fn execute_generic_addu(psx: *PSXState, lhs: u32, rhs: i32) u32 {
-    _ = psx; // FIXME
-
-    return wrapping_add_u32_i32(lhs, rhs);
-}
-
 fn execute_add(psx: *PSXState, instruction: instructions.add) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
@@ -111,7 +90,7 @@ fn execute_addu(psx: *PSXState, instruction: instructions.addu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    const result = execute_generic_addu(psx, value_s, @bitCast(value_t));
+    const result = wrapping_add_u32_i32(value_s, @bitCast(value_t));
 
     store_reg(&psx.registers, instruction.rd, result);
 }
@@ -243,7 +222,7 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
 fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
     const value_s = load_reg(psx.registers, instruction.rs);
 
-    const result = execute_generic_add(psx, value_s, @as(i16, @bitCast(instruction.imm_u16)));
+    const result = execute_generic_add(psx, value_s, instruction.imm_i16);
 
     store_reg(&psx.registers, instruction.rt, result);
 }
@@ -251,7 +230,7 @@ fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
 fn execute_addiu(psx: *PSXState, instruction: instructions.addiu) void {
     const value_s = load_reg(psx.registers, instruction.rs);
 
-    const result = execute_generic_addu(psx, value_s, @as(i16, @bitCast(instruction.imm_u16)));
+    const result = wrapping_add_u32_i32(value_s, instruction.imm_i16);
 
     store_reg(&psx.registers, instruction.rt, result);
 }
@@ -342,6 +321,25 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     cpu.store_mem_u32(psx, address, value);
+}
+
+fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
+    var result: u32 = undefined;
+    var overflow: u1 = undefined;
+
+    if (rhs >= 0) {
+        // NOTE: using two's-complement to ignore signedness
+        result, overflow = @addWithOverflow(lhs, @as(u32, @intCast(rhs)));
+    } else {
+        result, overflow = @subWithOverflow(lhs, @as(u32, @intCast(-rhs)));
+    }
+
+    if (overflow == 1) {
+        _ = psx; // FIXME
+        unreachable;
+    }
+
+    return result;
 }
 
 fn wrapping_add_u32_i32(lhs: u32, rhs: i32) u32 {

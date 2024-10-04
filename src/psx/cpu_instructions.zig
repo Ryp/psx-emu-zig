@@ -129,8 +129,8 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .BNE => .{ .bne = decode_generic_branch(op_u32) },
         .BLEZ => unreachable,
         .BGTZ => unreachable,
-        .ADDI => .{ .addi = decode_generic_rs_rt_imm_u16(op_u32) },
-        .ADDIU => .{ .addiu = decode_generic_rs_rt_imm_u16(op_u32) },
+        .ADDI => .{ .addi = decode_generic_rs_rt_imm_i16(op_u32) },
+        .ADDIU => .{ .addiu = decode_generic_rs_rt_imm_i16(op_u32) },
         .SLTI => unreachable,
         .SLTIU => unreachable,
         .ANDI => .{ .andi = decode_generic_rs_rt_imm_u16(op_u32) },
@@ -406,8 +406,8 @@ pub const xor = generic_rs_rt_rd;
 pub const nor = generic_rs_rt_rd;
 pub const slt = generic_rs_rt_rd;
 pub const sltu = generic_rs_rt_rd;
-pub const addi = generic_rs_rt_imm_u16;
-pub const addiu = generic_rs_rt_imm_u16;
+pub const addi = generic_rs_rt_imm_i16;
+pub const addiu = generic_rs_rt_imm_i16;
 pub const andi = generic_rs_rt_imm_u16;
 pub const ori = generic_rs_rt_imm_u16;
 pub const xori = generic_rs_rt_imm_u16;

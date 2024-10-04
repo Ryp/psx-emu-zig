@@ -28,8 +28,8 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
 
         .mfc0 => |i| print_mfc0_instruction(i),
         .mtc0 => |i| print_mtc0_instruction(i),
-        .addi => |i| print_i_instruction("addi", i),
-        .addiu => |i| print_i_instruction("addiu", i),
+        .addi => |i| print_i_add_instruction("addi", i),
+        .addiu => |i| print_i_add_instruction("addiu", i),
         .andi => |i| print_i_instruction("andi", i),
         .ori => |i| print_i_instruction("ori", i),
         .xori => |i| print_i_instruction("xori", i),
@@ -49,6 +49,10 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
 
 fn print_i_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm_u16) void {
     std.debug.print("{s} ${}, ${}, 0x{x:0>4}\n", .{ op_name, instruction.rt, instruction.rs, instruction.imm_u16 });
+}
+
+fn print_i_add_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm_i16) void {
+    std.debug.print("{s} ${}, ${}, {}\n", .{ op_name, instruction.rt, instruction.rs, instruction.imm_i16 });
 }
 
 fn print_i_mem_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm_i16) void {
