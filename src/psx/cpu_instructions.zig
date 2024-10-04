@@ -60,6 +60,7 @@ pub const Instruction = union(enum) {
     nor: nor,
     slt: slt,
     sltu: sltu,
+    b_cond_z: b_cond_z,
     j: j,
     jal: jal,
     beq: beq,
@@ -126,7 +127,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .SLTU => .{ .sltu = decode_generic_rs_rt_rd(op_u32) },
             _ => .{ .invalid = undefined },
         },
-        .BcondZ => unreachable,
+        .BcondZ => .{ .b_cond_z = decode_b_cond_z(op_u32) },
         .J => .{ .j = decode_generic_j(op_u32) },
         .JAL => .{ .jal = decode_generic_j(op_u32) },
         .BEQ => .{ .beq = decode_generic_branch(op_u32) },
@@ -355,6 +356,27 @@ pub const generic_rt_imm_u16 = struct {
 fn decode_generic_rt_imm_u16(op_u32: u32) generic_rt_imm_u16 {
     const op: OpCodeHelper = @bitCast(op_u32);
     return .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 };
+}
+
+pub const b_cond_z = struct {
+    rs: cpu.RegisterName,
+    test_greater: bool,
+    link: bool,
+    rel_offset: i18,
+};
+
+fn decode_b_cond_z(op_u32: u32) b_cond_z {
+    const Helper = packed struct {
+        imm16: u16,
+        test_greater: u1,
+        _unused: u3,
+        link: u1,
+        rs: cpu.RegisterName,
+        primary: PrimaryOpCode,
+    };
+
+    const op: Helper = @bitCast(op_u32);
+    return .{ .rs = op.rs, .test_greater = op.test_greater == 1, .link = op.link == 1, .rel_offset = @bitCast(@as(u18, op.imm16) << 2) };
 }
 
 pub const generic_j = struct {

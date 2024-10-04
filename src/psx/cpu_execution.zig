@@ -20,6 +20,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .nor => |i| execute_nor(psx, i),
         .slt => unreachable,
         .sltu => |i| execute_sltu(psx, i),
+        .b_cond_z => |i| execute_b_cond_z(psx, i),
         .j => |i| execute_j(psx, i),
         .jal => |i| execute_jal(psx, i),
         .beq => |i| execute_beq(psx, i),
@@ -164,6 +165,23 @@ fn execute_sltu(psx: *PSXState, instruction: instructions.sltu) void {
     const result: u32 = if (value_s < value_t) 1 else 0;
 
     store_reg(&psx.registers, instruction.rd, result);
+}
+
+fn execute_b_cond_z(psx: *PSXState, instruction: instructions.b_cond_z) void {
+    const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
+
+    var test_value = value_s < 0;
+
+    // Flip test if needed
+    test_value = test_value != instruction.test_greater;
+
+    if (test_value) {
+        if (instruction.link) {
+            store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.pc);
+        }
+
+        execute_branch(psx, instruction.rel_offset);
+    }
 }
 
 fn execute_j(psx: *PSXState, instruction: instructions.j) void {

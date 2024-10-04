@@ -22,6 +22,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .slt => |i| print_ralu_instruction("slt", i),
         .sltu => |i| print_ralu_instruction("sltu", i),
 
+        .b_cond_z => |i| print_b_cond_z_instruction(i),
         .j => |i| print_j_instruction("j", i),
         .jal => |i| print_j_instruction("jal", i),
         .beq => |i| print_branch_instruction("beq", i),
@@ -73,6 +74,10 @@ fn print_jr_instruction(instruction: instructions.jr) void {
 
 fn print_jalr_instruction(instruction: instructions.jalr) void {
     std.debug.print("jalr ${} ${}\n", .{ instruction.rs, instruction.rd });
+}
+
+fn print_b_cond_z_instruction(instruction: instructions.b_cond_z) void {
+    std.debug.print("b{s}z{s} ${}, {}\n", .{ if (instruction.test_greater) "ge" else "lt", if (instruction.link) "al" else "", instruction.rs, instruction.rel_offset });
 }
 
 fn print_j_instruction(op_name: [:0]const u8, instruction: instructions.generic_j) void {
