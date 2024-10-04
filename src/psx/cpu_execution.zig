@@ -270,9 +270,12 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
 }
 
 fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value = load_reg(psx.registers, instruction.rt);
+
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+
+    cpu.store_mem_u8(psx, address, @truncate(value));
 }
 
 fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {

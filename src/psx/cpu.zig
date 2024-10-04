@@ -29,6 +29,8 @@ const HWRegs_SPU_SizeBytes = 640;
 const HWRegs_SPU_Offset = 0x1f801c00;
 const HWRegs_SPU_OffsetEnd = HWRegs_SPU_Offset + HWRegs_SPU_SizeBytes;
 
+const HWRegs_UnknownDebug_Offset = 0x1f802041;
+
 // 0x1fc00000 0x9fc00000 0xbfc00000 512K BIOS ROM
 pub const BIOS_SizeBytes = 512 * 1024;
 const BIOS_Offset = 0x1fc00000;
@@ -132,6 +134,47 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
             }
         },
         .Seg2 => unreachable,
+    }
+}
+
+pub fn store_mem_u8(psx: *PSXState, address_u32: u32, value: u8) void {
+    std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
+    std.debug.print("store value: 0x{x:0>2}\n", .{value});
+
+    if (psx.registers.sr & 0x00010000 != 0) {
+        std.debug.print("FIXME store ignored because of cache isolation\n", .{});
+        return;
+    }
+
+    const address: PSXAddress = @bitCast(address_u32);
+
+    std.debug.assert(address.offset % 1 == 0); // FIXME implement bus errors
+
+    switch (address.mapping) {
+        .Useg, .Seg0, .Seg1 => {
+            switch (address.offset) {
+                HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
+                    switch (offset) {
+                        HWRegs_UnknownDebug_Offset => {
+                            std.debug.print("FIXME Debug store ignored\n", .{});
+                        },
+                        HWRegs_SPU_Offset...HWRegs_SPU_OffsetEnd - 1 => {
+                            std.debug.print("FIXME SPU store ignored\n", .{});
+                        },
+                        else => unreachable,
+                    }
+                },
+                else => unreachable,
+            }
+        },
+        .Seg2 => {
+            switch (address.offset) {
+                0x1ffe0130 => {
+                    std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
+                },
+                else => unreachable,
+            }
+        },
     }
 }
 
