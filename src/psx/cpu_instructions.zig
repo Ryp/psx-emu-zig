@@ -48,6 +48,11 @@ const OpCodeHelper = packed struct {
 
 pub const Instruction = union(enum) {
     sll: sll,
+    srl: srl,
+    sra: sra,
+    sllv: sllv,
+    srlv: srlv,
+    srav: srav,
     jr: jr,
     jalr: jalr,
     add: add,
@@ -94,12 +99,12 @@ pub fn decode_instruction(op_u32: u32) Instruction {
 
     return switch (op.primary) {
         .SPECIAL => switch (op.b0_15.encoding_a.secondary) {
-            .SLL => .{ .sll = .{ .rt = op.rt, .rd = op.b0_15.encoding_a.rd, .shift_imm = op.b0_15.encoding_a.imm5 } },
-            .SRL => unreachable,
-            .SRA => unreachable,
-            .SLLV => unreachable,
-            .SRLV => unreachable,
-            .SRAV => unreachable,
+            .SLL => .{ .sll = decode_generic_shift_imm(op_u32) },
+            .SRL => .{ .srl = decode_generic_shift_imm(op_u32) },
+            .SRA => .{ .sra = decode_generic_shift_imm(op_u32) },
+            .SLLV => .{ .sllv = decode_generic_rs_rt_rd(op_u32) },
+            .SRLV => .{ .srlv = decode_generic_rs_rt_rd(op_u32) },
+            .SRAV => .{ .srav = decode_generic_rs_rt_rd(op_u32) },
 
             .JR => .{ .jr = .{ .rs = op.rs } },
             .JALR => .{ .jalr = .{ .rs = op.rs, .rd = op.b0_15.encoding_a.rd } },
@@ -360,6 +365,17 @@ fn decode_generic_rt_imm_u16(op_u32: u32) generic_rt_imm_u16 {
     return .{ .rt = op.rt, .imm_u16 = op.b0_15.encoding_b.imm16 };
 }
 
+pub const generic_shift_imm = struct {
+    rt: cpu.RegisterName,
+    rd: cpu.RegisterName,
+    shift_imm: u5,
+};
+
+fn decode_generic_shift_imm(op_u32: u32) generic_shift_imm {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rt = op.rt, .rd = op.b0_15.encoding_a.rd, .shift_imm = op.b0_15.encoding_a.imm5 };
+}
+
 pub const b_cond_z = struct {
     rs: cpu.RegisterName,
     test_greater: bool,
@@ -418,11 +434,12 @@ pub const bne = generic_branch;
 pub const blez = generic_branch_2;
 pub const bgtz = generic_branch_2;
 
-pub const sll = struct {
-    rt: cpu.RegisterName,
-    rd: cpu.RegisterName,
-    shift_imm: u5,
-};
+pub const sll = generic_shift_imm;
+pub const srl = generic_shift_imm;
+pub const sra = generic_shift_imm;
+pub const sllv = generic_rs_rt_rd;
+pub const srlv = generic_rs_rt_rd;
+pub const srav = generic_rs_rt_rd;
 
 pub const jr = struct {
     rs: cpu.RegisterName,

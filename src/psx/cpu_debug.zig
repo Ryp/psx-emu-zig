@@ -7,7 +7,13 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
     std.debug.print("0b{b:0>32} 0x{x:0>8} ", .{ op_code, op_code });
 
     switch (instruction) {
-        .sll => |i| print_sll_instruction(i),
+        .sll => |i| print_shift_instruction("sll", i),
+        .srl => |i| print_shift_instruction("srl", i),
+        .sra => |i| print_shift_instruction("sra", i),
+        .sllv => |i| print_ralu_instruction("sllv", i),
+        .srlv => |i| print_ralu_instruction("srlv", i),
+        .srav => |i| print_ralu_instruction("srav", i),
+
         .jr => |i| print_jr_instruction(i),
         .jalr => |i| print_jalr_instruction(i),
 
@@ -94,11 +100,11 @@ fn print_branch_2_instruction(op_name: [:0]const u8, instruction: instructions.g
     std.debug.print("{s} ${}, {}\n", .{ op_name, instruction.rs, instruction.rel_offset });
 }
 
-fn print_sll_instruction(instruction: instructions.sll) void {
+fn print_shift_instruction(op_name: [:0]const u8, instruction: instructions.generic_shift_imm) void {
     if (instruction.rd == .zero and instruction.rt == .zero and instruction.shift_imm == 0) {
         std.debug.print("nop\n", .{});
     } else {
-        std.debug.print("sll ${}, ${}, 0x{x:0>4}\n", .{ instruction.rd, instruction.rt, instruction.shift_imm });
+        std.debug.print("{s} ${}, ${}, {}\n", .{ op_name, instruction.rd, instruction.rt, instruction.shift_imm });
     }
 }
 
