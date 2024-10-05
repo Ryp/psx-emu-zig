@@ -15,6 +15,10 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .srav => |i| execute_srav(psx, i),
         .jr => |i| execute_jr(psx, i),
         .jalr => |i| execute_jalr(psx, i),
+        .mult => |i| execute_mult(psx, i),
+        .multu => |i| execute_multu(psx, i),
+        .div => |i| execute_div(psx, i),
+        .divu => |i| execute_divu(psx, i),
         .add => |i| execute_add(psx, i),
         .addu => |i| execute_addu(psx, i),
         .sub => |i| execute_sub(psx, i),
@@ -138,6 +142,30 @@ fn execute_jalr(psx: *PSXState, instruction: instructions.jalr) void {
     store_reg(&psx.registers, instruction.rd, psx.registers.pc);
 
     psx.registers.pc = load_reg(psx.registers, instruction.rs);
+}
+
+fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_multu(psx: *PSXState, instruction: instructions.multu) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_div(psx: *PSXState, instruction: instructions.div) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_divu(psx: *PSXState, instruction: instructions.divu) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_add(psx: *PSXState, instruction: instructions.add) void {

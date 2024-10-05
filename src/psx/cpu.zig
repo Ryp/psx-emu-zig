@@ -100,8 +100,10 @@ pub const Registers = struct {
     pc: u32 = 0xbfc00000, // Program Counter
     r_in: [32]u32 = undefined, // FIXME does it have an initial value?
     r_out: [32]u32 = undefined, // FIXME does it have an initial value?
+    hi: u32 = undefined, // FIXME does it have an initial value?
+    lo: u32 = undefined, // FIXME does it have an initial value?
+    sr: u32 = undefined, // FIXME does it have an initial value?
     pending_load: ?struct { register: RegisterName, value: u32 } = null,
-    sr: u32 = undefined,
 };
 
 const PSXAddress = packed struct {

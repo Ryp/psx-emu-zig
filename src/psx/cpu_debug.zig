@@ -17,6 +17,10 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .jr => |i| print_jr_instruction(i),
         .jalr => |i| print_jalr_instruction(i),
 
+        .mult => |i| print_generic_rs_rt("mult", i),
+        .multu => |i| print_generic_rs_rt("multu", i),
+        .div => |i| print_generic_rs_rt("div", i),
+        .divu => |i| print_generic_rs_rt("divu", i),
         .add => |i| print_ralu_instruction("add", i),
         .addu => |i| print_ralu_instruction("addu", i),
         .sub => |i| print_ralu_instruction("sub", i),
@@ -58,6 +62,10 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
 
         .invalid => unreachable,
     }
+}
+
+fn print_generic_rs_rt(op_name: [:0]const u8, instruction: instructions.generic_rs_rt) void {
+    std.debug.print("{s} ${}, ${}\n", .{ op_name, instruction.rt, instruction.rs });
 }
 
 fn print_i_instruction(op_name: [:0]const u8, instruction: instructions.generic_rs_rt_imm_u16) void {
