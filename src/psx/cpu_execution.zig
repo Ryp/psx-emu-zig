@@ -78,39 +78,56 @@ pub fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: 
 }
 
 fn execute_sll(psx: *PSXState, instruction: instructions.sll) void {
-    const reg_value = load_reg(psx.registers, instruction.rt);
+    const value = load_reg(psx.registers, instruction.rt);
 
-    store_reg(&psx.registers, instruction.rd, reg_value << instruction.shift_imm);
+    const result = value << instruction.shift_imm;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_srl(psx: *PSXState, instruction: instructions.srl) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value = load_reg(psx.registers, instruction.rt);
+
+    const result = value >> instruction.shift_imm;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_sra(psx: *PSXState, instruction: instructions.sra) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value: i32 = @bitCast(load_reg(psx.registers, instruction.rt));
+
+    // Sign-extending
+    const result = value >> instruction.shift_imm;
+
+    store_reg(&psx.registers, instruction.rd, @bitCast(result));
 }
 
 fn execute_sllv(psx: *PSXState, instruction: instructions.sllv) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value = load_reg(psx.registers, instruction.rt);
+    const shift: u5 = @truncate(load_reg(psx.registers, instruction.rs));
+
+    const result = value << shift;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_srlv(psx: *PSXState, instruction: instructions.srlv) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value = load_reg(psx.registers, instruction.rt);
+    const shift: u5 = @truncate(load_reg(psx.registers, instruction.rs));
+
+    const result = value >> shift;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_srav(psx: *PSXState, instruction: instructions.srav) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value: i32 = @bitCast(load_reg(psx.registers, instruction.rt));
+    const shift: u5 = @truncate(load_reg(psx.registers, instruction.rs));
+
+    // Sign-extending
+    const result = value >> shift;
+
+    store_reg(&psx.registers, instruction.rd, @bitCast(result));
 }
 
 fn execute_jr(psx: *PSXState, instruction: instructions.jr) void {
