@@ -157,9 +157,22 @@ fn execute_multu(psx: *PSXState, instruction: instructions.multu) void {
 }
 
 fn execute_div(psx: *PSXState, instruction: instructions.div) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const numerator_u32 = load_reg(psx.registers, instruction.rs);
+    const numerator: i32 = @bitCast(numerator_u32);
+    const divisor: i32 = @bitCast(load_reg(psx.registers, instruction.rt));
+
+    if (divisor == 0) {
+        // Division by zero
+        psx.registers.hi = @bitCast(numerator);
+        psx.registers.lo = if (numerator < 0) 1 else 0xff_ff_ff_ff;
+    } else if (numerator_u32 == 0x80_00_00_00 and divisor == -1) {
+        // Result can't be represented
+        psx.registers.hi = 0;
+        psx.registers.lo = numerator_u32;
+    } else {
+        psx.registers.hi = @bitCast(@rem(numerator, divisor));
+        psx.registers.lo = @bitCast(@divTrunc(numerator, divisor));
+    }
 }
 
 fn execute_divu(psx: *PSXState, instruction: instructions.divu) void {
