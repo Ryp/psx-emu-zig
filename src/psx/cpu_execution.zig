@@ -31,7 +31,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .or_ => |i| execute_or(psx, i),
         .xor => |i| execute_xor(psx, i),
         .nor => |i| execute_nor(psx, i),
-        .slt => unreachable,
+        .slt => |i| execute_slt(psx, i),
         .sltu => |i| execute_sltu(psx, i),
         .b_cond_z => |i| execute_b_cond_z(psx, i),
         .j => |i| execute_j(psx, i),
@@ -267,9 +267,12 @@ fn execute_nor(psx: *PSXState, instruction: instructions.nor) void {
 }
 
 fn execute_slt(psx: *PSXState, instruction: instructions.slt) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
+    const value_t: i32 = @bitCast(load_reg(psx.registers, instruction.rt));
+
+    const result: u32 = if (value_s < value_t) 1 else 0;
+
+    store_reg(&psx.registers, instruction.rd, result);
 }
 
 fn execute_sltu(psx: *PSXState, instruction: instructions.sltu) void {
@@ -400,9 +403,11 @@ fn execute_slti(psx: *PSXState, instruction: instructions.slti) void {
 }
 
 fn execute_sltiu(psx: *PSXState, instruction: instructions.sltiu) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value_s = load_reg(psx.registers, instruction.rs);
+
+    const result: u32 = if (value_s < instruction.imm_i16) 1 else 0;
+
+    store_reg(&psx.registers, instruction.rt, result);
 }
 
 fn execute_andi(psx: *PSXState, instruction: instructions.andi) void {
