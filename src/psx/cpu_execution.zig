@@ -196,9 +196,17 @@ fn execute_div(psx: *PSXState, instruction: instructions.div) void {
 }
 
 fn execute_divu(psx: *PSXState, instruction: instructions.divu) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const numerator = load_reg(psx.registers, instruction.rs);
+    const divisor = load_reg(psx.registers, instruction.rt);
+
+    if (divisor == 0) {
+        // Division by zero
+        psx.registers.hi = numerator;
+        psx.registers.lo = 0xff_ff_ff_ff;
+    } else {
+        psx.registers.hi = @rem(numerator, divisor);
+        psx.registers.lo = @divTrunc(numerator, divisor);
+    }
 }
 
 fn execute_add(psx: *PSXState, instruction: instructions.add) void {
