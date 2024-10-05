@@ -149,27 +149,19 @@ fn execute_jalr(psx: *PSXState, instruction: instructions.jalr) void {
 }
 
 fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    store_reg(&psx.registers, instruction.rd, psx.registers.hi);
 }
 
 fn execute_mthi(psx: *PSXState, instruction: instructions.mthi) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    psx.registers.hi = load_reg(psx.registers, instruction.rd);
 }
 
 fn execute_mflo(psx: *PSXState, instruction: instructions.mflo) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    store_reg(&psx.registers, instruction.rd, psx.registers.lo);
 }
 
 fn execute_mtlo(psx: *PSXState, instruction: instructions.mtlo) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    psx.registers.lo = load_reg(psx.registers, instruction.rd);
 }
 
 fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
