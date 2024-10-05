@@ -55,6 +55,10 @@ pub const Instruction = union(enum) {
     srav: srav,
     jr: jr,
     jalr: jalr,
+    mfhi: mfhi,
+    mthi: mthi,
+    mflo: mflo,
+    mtlo: mtlo,
     mult: mult,
     multu: multu,
     div: div,
@@ -115,10 +119,10 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .SYSCALL => unreachable,
             .BREAK => unreachable,
 
-            .MFHI => unreachable,
-            .MTHI => unreachable,
-            .MFLO => unreachable,
-            .MTLO => unreachable,
+            .MFHI => .{ .mfhi = decode_generic_rd(op_u32) },
+            .MTHI => .{ .mthi = decode_generic_rd(op_u32) },
+            .MFLO => .{ .mflo = decode_generic_rd(op_u32) },
+            .MTLO => .{ .mtlo = decode_generic_rd(op_u32) },
 
             .MULT => .{ .mult = decode_generic_rs_rt(op_u32) },
             .MULTU => .{ .multu = decode_generic_rs_rt(op_u32) },
@@ -326,6 +330,15 @@ fn decode_cop0_instruction(op_u32: u32) Instruction {
     }
 }
 
+pub const generic_rd = struct {
+    rd: cpu.RegisterName,
+};
+
+fn decode_generic_rd(op_u32: u32) generic_rd {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rd = op.b0_15.encoding_a.rd };
+}
+
 pub const generic_rs_rt = struct {
     rs: cpu.RegisterName,
     rt: cpu.RegisterName,
@@ -470,6 +483,10 @@ pub const mtc0 = struct {
 };
 pub const mfc0 = mtc0;
 
+pub const mfhi = generic_rd;
+pub const mthi = generic_rd;
+pub const mflo = generic_rd;
+pub const mtlo = generic_rd;
 pub const mult = generic_rs_rt;
 pub const multu = generic_rs_rt;
 pub const div = generic_rs_rt;

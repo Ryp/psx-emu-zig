@@ -15,6 +15,10 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .srav => |i| execute_srav(psx, i),
         .jr => |i| execute_jr(psx, i),
         .jalr => |i| execute_jalr(psx, i),
+        .mfhi => |i| execute_mfhi(psx, i),
+        .mthi => |i| execute_mthi(psx, i),
+        .mflo => |i| execute_mflo(psx, i),
+        .mtlo => |i| execute_mtlo(psx, i),
         .mult => |i| execute_mult(psx, i),
         .multu => |i| execute_multu(psx, i),
         .div => |i| execute_div(psx, i),
@@ -142,6 +146,30 @@ fn execute_jalr(psx: *PSXState, instruction: instructions.jalr) void {
     store_reg(&psx.registers, instruction.rd, psx.registers.pc);
 
     psx.registers.pc = load_reg(psx.registers, instruction.rs);
+}
+
+fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_mthi(psx: *PSXState, instruction: instructions.mthi) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_mflo(psx: *PSXState, instruction: instructions.mflo) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_mtlo(psx: *PSXState, instruction: instructions.mtlo) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
