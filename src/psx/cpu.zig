@@ -40,6 +40,8 @@ pub const BIOS_SizeBytes = 512 * 1024;
 const BIOS_Offset = 0x1fc00000;
 const BIOS_OffsetEnd = BIOS_Offset + BIOS_SizeBytes;
 
+const CacheControl_Offset = 0x1ffe0130;
+
 pub const PSXState = struct {
     registers: Registers = .{},
     bios: [BIOS_SizeBytes]u8,
@@ -166,7 +168,15 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
                 else => unreachable,
             }
         },
-        .Seg2 => unreachable,
+        .Seg2 => {
+            switch (address.offset) {
+                CacheControl_Offset => {
+                    std.debug.print("FIXME load ignored at cache control offset 0x{x:0>8}\n", .{address_u32});
+                    return 0;
+                },
+                else => unreachable,
+            }
+        },
     }
 }
 
@@ -204,7 +214,7 @@ pub fn store_mem_u8(psx: *PSXState, address_u32: u32, value: u8) void {
         },
         .Seg2 => {
             switch (address.offset) {
-                0x1ffe0130 => {
+                CacheControl_Offset => {
                     std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
                 },
                 else => unreachable,
@@ -242,7 +252,7 @@ pub fn store_mem_u16(psx: *PSXState, address_u32: u32, value: u16) void {
         },
         .Seg2 => {
             switch (address.offset) {
-                0x1ffe0130 => {
+                CacheControl_Offset => {
                     std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
                 },
                 else => unreachable,
@@ -293,7 +303,7 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
         },
         .Seg2 => {
             switch (address.offset) {
-                0x1ffe0130 => {
+                CacheControl_Offset => {
                     std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
                 },
                 else => unreachable,
