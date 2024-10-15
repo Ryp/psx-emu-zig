@@ -27,6 +27,11 @@ const HWRegs_SizeBytes = 8 * 1024;
 const HWRegs_Offset = 0x1f801000;
 const HWRegs_OffsetEnd = HWRegs_Offset + HWRegs_SizeBytes;
 
+// FIXME unclear where actually this lives
+const HWRegs_Timers_SizeBytes = 3 * 16;
+const HWRegs_Timers_Offset = 0x1f801100;
+const HWRegs_Timers_OffsetEnd = HWRegs_Timers_Offset + HWRegs_Timers_SizeBytes;
+
 const HWRegs_SPU_SizeBytes = 640;
 const HWRegs_SPU_Offset = 0x1f801c00;
 const HWRegs_SPU_OffsetEnd = HWRegs_SPU_Offset + HWRegs_SPU_SizeBytes;
@@ -160,6 +165,15 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
                     const u32_slice = psx.ram[local_offset..];
                     return std.mem.readInt(u32, u32_slice[0..4], .little);
                 },
+                HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
+                    switch (offset) {
+                        HWRegs_InterruptMask_Offset, HWRegs_InterruptStatus_Offset => {
+                            std.debug.print("FIXME Interrupt load ignored\n", .{});
+                            return 0;
+                        },
+                        else => unreachable,
+                    }
+                },
                 BIOS_Offset...BIOS_OffsetEnd - 1 => |offset| {
                     const local_offset = offset - BIOS_Offset;
                     const u32_slice = psx.bios[local_offset..];
@@ -241,6 +255,9 @@ pub fn store_mem_u16(psx: *PSXState, address_u32: u32, value: u16) void {
             switch (address.offset) {
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     switch (offset) {
+                        HWRegs_Timers_Offset...HWRegs_Timers_OffsetEnd - 1 => {
+                            std.debug.print("FIXME Timer store ignored\n", .{});
+                        },
                         HWRegs_SPU_Offset...HWRegs_SPU_OffsetEnd - 1 => {
                             std.debug.print("FIXME SPU store ignored\n", .{});
                         },
