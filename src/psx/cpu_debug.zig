@@ -16,6 +16,8 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
 
         .jr => |i| print_jr_instruction(i),
         .jalr => |i| print_jalr_instruction(i),
+        .syscall => std.debug.print("syscall\n", .{}),
+        .break_ => std.debug.print("break\n", .{}),
 
         .mfhi => |i| print_generic_rd("mfhi", i),
         .mthi => |i| print_generic_rd("mthi", i),
@@ -60,10 +62,13 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .lwl => |i| print_i_mem_instruction("lwl", i),
         .lw => |i| print_i_mem_instruction("lw", i),
         .lbu => |i| print_i_mem_instruction("lbu", i),
+        .lhu => |i| print_i_mem_instruction("lhu", i),
+        .lwr => |i| print_i_mem_instruction("lwr", i),
         .sb => |i| print_i_mem_instruction("sb", i),
         .sh => |i| print_i_mem_instruction("sh", i),
         .swl => |i| print_i_mem_instruction("swl", i),
         .sw => |i| print_i_mem_instruction("sw", i),
+        .swr => |i| print_i_mem_instruction("swr", i),
 
         .invalid => unreachable,
     }

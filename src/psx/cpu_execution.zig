@@ -15,6 +15,8 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .srav => |i| execute_srav(psx, i),
         .jr => |i| execute_jr(psx, i),
         .jalr => |i| execute_jalr(psx, i),
+        .syscall => execute_syscall(psx),
+        .break_ => execute_break(psx),
         .mfhi => |i| execute_mfhi(psx, i),
         .mthi => |i| execute_mthi(psx, i),
         .mflo => |i| execute_mflo(psx, i),
@@ -56,10 +58,13 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .lwl => |i| execute_lwl(psx, i),
         .lw => |i| execute_lw(psx, i),
         .lbu => |i| execute_lbu(psx, i),
+        .lhu => |i| execute_lhu(psx, i),
+        .lwr => |i| execute_lwr(psx, i),
         .sb => |i| execute_sb(psx, i),
         .sh => |i| execute_sh(psx, i),
         .swl => |i| execute_swl(psx, i),
         .sw => |i| execute_sw(psx, i),
+        .swr => |i| execute_swr(psx, i),
 
         .invalid => unreachable,
     }
@@ -146,6 +151,16 @@ fn execute_jalr(psx: *PSXState, instruction: instructions.jalr) void {
     store_reg(&psx.registers, instruction.rd, psx.registers.pc);
 
     psx.registers.pc = load_reg(psx.registers, instruction.rs);
+}
+
+fn execute_syscall(psx: *PSXState) void {
+    _ = psx;
+    unreachable;
+}
+
+fn execute_break(psx: *PSXState) void {
+    _ = psx;
+    unreachable;
 }
 
 fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
@@ -464,6 +479,12 @@ fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
     unreachable;
 }
 
+fn execute_lwr(psx: *PSXState, instruction: instructions.lwr) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
 fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
@@ -480,6 +501,12 @@ fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
     const value: u8 = cpu.load_mem_u8(psx, address);
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+}
+
+fn execute_lhu(psx: *PSXState, instruction: instructions.lhu) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
@@ -501,6 +528,12 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
 }
 
 fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
     _ = psx;
     _ = instruction;
     unreachable;

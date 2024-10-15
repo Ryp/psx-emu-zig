@@ -46,6 +46,7 @@ const OpCodeHelper = packed struct {
     primary: PrimaryOpCode,
 };
 
+// NOTE: names with '_' in the name clash with zig builtins
 pub const Instruction = union(enum) {
     sll: sll,
     srl: srl,
@@ -55,6 +56,8 @@ pub const Instruction = union(enum) {
     srav: srav,
     jr: jr,
     jalr: jalr,
+    syscall,
+    break_,
     mfhi: mfhi,
     mthi: mthi,
     mflo: mflo,
@@ -95,10 +98,13 @@ pub const Instruction = union(enum) {
     lwl: lwl,
     lw: lw,
     lbu: lbu,
+    lhu: lhu,
+    lwr: lwr,
     sb: sb,
     sh: sh,
     swl: swl,
     sw: sw,
+    swr: swr,
     invalid,
 };
 
@@ -116,8 +122,8 @@ pub fn decode_instruction(op_u32: u32) Instruction {
 
             .JR => .{ .jr = .{ .rs = op.rs } },
             .JALR => .{ .jalr = .{ .rs = op.rs, .rd = op.b0_15.encoding_a.rd } },
-            .SYSCALL => unreachable,
-            .BREAK => unreachable,
+            .SYSCALL => .{ .syscall = undefined },
+            .BREAK => .{ .break_ = undefined },
 
             .MFHI => .{ .mfhi = decode_generic_rd(op_u32) },
             .MTHI => .{ .mthi = decode_generic_rd(op_u32) },
@@ -166,13 +172,13 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .LWL => .{ .lwl = decode_generic_rs_rt_imm_i16(op_u32) },
         .LW => .{ .lw = decode_generic_rs_rt_imm_i16(op_u32) },
         .LBU => .{ .lbu = decode_generic_rs_rt_imm_i16(op_u32) },
-        .LHU => unreachable,
-        .LWR => unreachable,
+        .LHU => .{ .lhu = decode_generic_rs_rt_imm_i16(op_u32) },
+        .LWR => .{ .lwr = decode_generic_rs_rt_imm_i16(op_u32) },
         .SB => .{ .sb = decode_generic_rs_rt_imm_i16(op_u32) },
         .SH => .{ .sh = decode_generic_rs_rt_imm_i16(op_u32) },
         .SWL => .{ .swl = decode_generic_rs_rt_imm_i16(op_u32) },
         .SW => .{ .sw = decode_generic_rs_rt_imm_i16(op_u32) },
-        .SWR => unreachable,
+        .SWR => .{ .swr = decode_generic_rs_rt_imm_i16(op_u32) },
         .LWC0 => unreachable,
         .LWC1 => unreachable,
         .LWC2 => unreachable,
@@ -514,7 +520,10 @@ pub const lh = generic_rs_rt_imm_i16;
 pub const lwl = generic_rs_rt_imm_i16;
 pub const lw = generic_rs_rt_imm_i16;
 pub const lbu = generic_rs_rt_imm_i16;
+pub const lhu = generic_rs_rt_imm_i16;
+pub const lwr = generic_rs_rt_imm_i16;
 pub const sb = generic_rs_rt_imm_i16;
 pub const sh = generic_rs_rt_imm_i16;
 pub const swl = generic_rs_rt_imm_i16;
 pub const sw = generic_rs_rt_imm_i16;
+pub const swr = generic_rs_rt_imm_i16;
