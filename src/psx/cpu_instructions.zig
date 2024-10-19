@@ -85,6 +85,7 @@ pub const Instruction = union(enum) {
     bgtz: bgtz,
     mfc0: mfc0,
     mtc0: mtc0,
+    rfe,
     addi: addi,
     addiu: addiu,
     slti: slti,
@@ -300,7 +301,7 @@ const SecondaryOpCode = enum(u6) {
 //   1110nn | rs   | rt   | <--immediate16bit--> | SWCn rt_dat,[rs+imm]
 
 const Cop0 = packed struct {
-    _unused: u6,
+    bits0_5: u6,
     rd: u5,
     rt: u5,
     rs: cpu.RegisterName,
@@ -308,9 +309,11 @@ const Cop0 = packed struct {
     primary: PrimaryOpCode,
 };
 
+// FIXME check encoding of MFCn and friends
 const Cop0_Op = enum(u5) {
     mfc0 = 0b00000,
     mtc0 = 0b00100,
+    cop0_extra = 0b10000,
     _,
 };
 
@@ -335,6 +338,10 @@ fn decode_cop0_instruction(op_u32: u32) Instruction {
     switch (op_cop0.op) {
         .mfc0 => return .{ .mfc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
         .mtc0 => return .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
+        .cop0_extra => switch (op_cop0.bits0_5) {
+            0b010000 => return .{ .rfe = undefined },
+            else => unreachable,
+        },
         else => unreachable,
     }
 }

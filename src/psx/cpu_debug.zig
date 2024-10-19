@@ -23,6 +23,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .mthi => |i| print_generic_rd("mthi", i),
         .mflo => |i| print_generic_rd("mflo", i),
         .mtlo => |i| print_generic_rd("mtlo", i),
+        .rfe => std.debug.print("rfe\n", .{}),
 
         .mult => |i| print_generic_rs_rt("mult", i),
         .multu => |i| print_generic_rs_rt("multu", i),

@@ -21,6 +21,7 @@ pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction
         .mthi => |i| execute_mthi(psx, i),
         .mflo => |i| execute_mflo(psx, i),
         .mtlo => |i| execute_mtlo(psx, i),
+        .rfe => execute_rfe(psx),
         .mult => |i| execute_mult(psx, i),
         .multu => |i| execute_multu(psx, i),
         .div => |i| execute_div(psx, i),
@@ -162,22 +163,6 @@ fn execute_syscall(psx: *PSXState) void {
 fn execute_break(psx: *PSXState) void {
     _ = psx;
     unreachable;
-}
-
-fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
-    store_reg(&psx.registers, instruction.rd, psx.registers.hi);
-}
-
-fn execute_mthi(psx: *PSXState, instruction: instructions.mthi) void {
-    psx.registers.hi = load_reg(psx.registers, instruction.rd);
-}
-
-fn execute_mflo(psx: *PSXState, instruction: instructions.mflo) void {
-    store_reg(&psx.registers, instruction.rd, psx.registers.lo);
-}
-
-fn execute_mtlo(psx: *PSXState, instruction: instructions.mtlo) void {
-    psx.registers.lo = load_reg(psx.registers, instruction.rd);
 }
 
 fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
@@ -547,6 +532,26 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     cpu.store_mem_u32(psx, address, value);
+}
+
+fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
+    store_reg(&psx.registers, instruction.rd, psx.registers.hi);
+}
+
+fn execute_mthi(psx: *PSXState, instruction: instructions.mthi) void {
+    psx.registers.hi = load_reg(psx.registers, instruction.rd);
+}
+
+fn execute_mflo(psx: *PSXState, instruction: instructions.mflo) void {
+    store_reg(&psx.registers, instruction.rd, psx.registers.lo);
+}
+
+fn execute_mtlo(psx: *PSXState, instruction: instructions.mtlo) void {
+    psx.registers.lo = load_reg(psx.registers, instruction.rd);
+}
+
+fn execute_rfe(psx: *PSXState) void {
+    psx.registers.sr.interrupt_stack >>= 2;
 }
 
 fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
