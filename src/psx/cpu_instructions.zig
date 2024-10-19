@@ -314,15 +314,18 @@ const Cop0_Op = enum(u5) {
     _,
 };
 
-const Cop0_MTC0Target = enum(u5) {
-    BPC = 3,
-    BDA = 5,
-    Unknown = 6,
-    DCIC = 7,
-    BDAM = 9,
-    BPCM = 11,
-    SR = 12,
-    CAUSE = 13,
+const Cop0RegisterName = enum(u5) {
+    BPC = 3, // Breakpoint on execute (R/W)
+    BDA = 5, // Breakpoint on data access (R/W)
+    JUMPDEST = 6, // Randomly memorized jump address (R)
+    DCIC = 7, // Breakpoint control (R/W)
+    BadVaddr = 8, // Bad Virtual Address (R)
+    BDAM = 9, // Data Access breakpoint mask (R/W)
+    BPCM = 11, // Execute breakpoint mask (R/W)
+    SR = 12, // System status register (R/W)
+    CAUSE = 13, // (R) Describes the most recently recognised exception
+    EPC = 14, // Return Address from Trap (R)
+    PRID = 15, // Processor ID (R)
     _,
 };
 
@@ -485,7 +488,7 @@ pub const jalr = struct {
 
 pub const mtc0 = struct {
     cpu_rs: cpu.RegisterName,
-    target: Cop0_MTC0Target,
+    target: Cop0RegisterName,
 };
 pub const mfc0 = mtc0;
 

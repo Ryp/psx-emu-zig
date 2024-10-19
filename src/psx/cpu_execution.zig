@@ -144,18 +144,19 @@ fn execute_srav(psx: *PSXState, instruction: instructions.srav) void {
 }
 
 fn execute_jr(psx: *PSXState, instruction: instructions.jr) void {
-    psx.registers.pc = load_reg(psx.registers, instruction.rs);
+    const address = load_reg(psx.registers, instruction.rs);
+    execute_generic_jump(psx, address);
 }
 
 fn execute_jalr(psx: *PSXState, instruction: instructions.jalr) void {
-    store_reg(&psx.registers, instruction.rd, psx.registers.pc);
+    store_reg(&psx.registers, instruction.rd, psx.registers.next_pc);
 
-    psx.registers.pc = load_reg(psx.registers, instruction.rs);
+    const address = load_reg(psx.registers, instruction.rs);
+    execute_generic_jump(psx, address);
 }
 
 fn execute_syscall(psx: *PSXState) void {
-    _ = psx;
-    unreachable;
+    execute_exception(psx, .SysCall);
 }
 
 fn execute_break(psx: *PSXState) void {
@@ -317,26 +318,23 @@ fn execute_b_cond_z(psx: *PSXState, instruction: instructions.b_cond_z) void {
 
     if (test_value) {
         if (instruction.link) {
-            store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.pc);
+            store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.next_pc);
         }
 
-        execute_branch(psx, instruction.rel_offset);
+        execute_generic_branch(psx, instruction.rel_offset);
     }
 }
 
 fn execute_j(psx: *PSXState, instruction: instructions.j) void {
-    psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
+    const address = (psx.registers.next_pc & 0xf0_00_00_00) | instruction.offset;
+    execute_generic_jump(psx, address);
 }
 
 fn execute_jal(psx: *PSXState, instruction: instructions.jal) void {
-    store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.pc);
+    store_reg(&psx.registers, cpu.RegisterName.ra, psx.registers.next_pc);
 
-    psx.registers.pc = (psx.registers.pc & 0xf0_00_00_00) | instruction.offset;
-}
-
-fn execute_branch(psx: *PSXState, offset: i32) void {
-    psx.registers.pc = wrapping_add_u32_i32(psx.registers.pc, offset);
-    psx.registers.pc -%= 4;
+    const address = (psx.registers.next_pc & 0xf0_00_00_00) | instruction.offset;
+    execute_generic_jump(psx, address);
 }
 
 fn execute_beq(psx: *PSXState, instruction: instructions.beq) void {
@@ -344,7 +342,7 @@ fn execute_beq(psx: *PSXState, instruction: instructions.beq) void {
     const value_t = load_reg(psx.registers, instruction.rt);
 
     if (value_s == value_t) {
-        execute_branch(psx, instruction.rel_offset);
+        execute_generic_branch(psx, instruction.rel_offset);
     }
 }
 
@@ -353,7 +351,7 @@ fn execute_bne(psx: *PSXState, instruction: instructions.bne) void {
     const value_t = load_reg(psx.registers, instruction.rt);
 
     if (value_s != value_t) {
-        execute_branch(psx, instruction.rel_offset);
+        execute_generic_branch(psx, instruction.rel_offset);
     }
 }
 
@@ -361,7 +359,7 @@ fn execute_blez(psx: *PSXState, instruction: instructions.blez) void {
     const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
 
     if (value_s <= 0) {
-        execute_branch(psx, instruction.rel_offset);
+        execute_generic_branch(psx, instruction.rel_offset);
     }
 }
 
@@ -369,15 +367,17 @@ fn execute_bgtz(psx: *PSXState, instruction: instructions.bgtz) void {
     const value_s: i32 = @bitCast(load_reg(psx.registers, instruction.rs));
 
     if (value_s > 0) {
-        execute_branch(psx, instruction.rel_offset);
+        execute_generic_branch(psx, instruction.rel_offset);
     }
 }
 
 fn execute_mfc0(psx: *PSXState, instruction: instructions.mtc0) void {
-    const value = switch (instruction.target) {
-        .BPC, .BDA, .Unknown, .DCIC, .BDAM, .BPCM, .CAUSE => unreachable,
-        .SR => psx.registers.sr,
-        else => unreachable,
+    const value: u32 = switch (instruction.target) {
+        .BPC, .BDA, .JUMPDEST, .DCIC, .BadVaddr, .BDAM, .BPCM, .PRID => unreachable,
+        .SR => @bitCast(psx.registers.sr),
+        .CAUSE => @bitCast(psx.registers.cause),
+        .EPC => psx.registers.epc,
+        _ => unreachable,
     };
 
     psx.registers.pending_load = .{ .register = instruction.cpu_rs, .value = @bitCast(value) };
@@ -387,17 +387,18 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
     const value = load_reg(psx.registers, instruction.cpu_rs);
 
     switch (instruction.target) {
-        .BPC, .BDA, .Unknown, .DCIC, .BDAM, .BPCM => {
+        .BPC, .BDA, .JUMPDEST, .DCIC, .BadVaddr, .BDAM, .BPCM, .PRID => {
             std.debug.print("FIXME mtc0 target write ignored\n", .{});
         },
-        .SR => psx.registers.sr = value,
+        .SR => psx.registers.sr = @bitCast(value),
         .CAUSE => switch (value) {
             0 => {
                 std.debug.print("FIXME mtc0 target write ignored\n", .{});
             },
             else => unreachable,
         },
-        else => unreachable,
+        .EPC => unreachable,
+        _ => unreachable,
     }
 }
 
@@ -565,6 +566,26 @@ fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
     }
 
     return result;
+}
+
+fn execute_generic_jump(psx: *PSXState, address: u32) void {
+    psx.registers.next_pc = address;
+}
+
+fn execute_generic_branch(psx: *PSXState, offset: i32) void {
+    psx.registers.next_pc = wrapping_add_u32_i32(psx.registers.pc, offset);
+}
+
+fn execute_exception(psx: *PSXState, cause: cpu.ExceptionCause) void {
+    psx.registers.epc = psx.registers.current_instruction_pc;
+
+    psx.registers.sr.interrupt_stack <<= 2;
+
+    psx.registers.cause = @bitCast(@as(u32, 0));
+    psx.registers.cause.cause = cause;
+
+    psx.registers.pc = if (psx.registers.sr.bev == 1) 0xbfc00180 else 0x80000080;
+    psx.registers.next_pc = psx.registers.pc +% 4;
 }
 
 fn wrapping_add_u32_i32(lhs: u32, rhs: i32) u32 {
