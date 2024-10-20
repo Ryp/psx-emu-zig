@@ -32,9 +32,16 @@ const HWRegs_Timers_SizeBytes = 3 * 16;
 const HWRegs_Timers_Offset = 0x1f801100;
 const HWRegs_Timers_OffsetEnd = HWRegs_Timers_Offset + HWRegs_Timers_SizeBytes;
 
+const HWRegs_DMA_SizeBytes = 0x80;
+const HWRegs_DMA_Offset = 0x1f801080;
+const HWRegs_DMA_OffsetEnd = HWRegs_DMA_Offset + HWRegs_DMA_SizeBytes;
+
 const HWRegs_SPU_SizeBytes = 640;
 const HWRegs_SPU_Offset = 0x1f801c00;
 const HWRegs_SPU_OffsetEnd = HWRegs_SPU_Offset + HWRegs_SPU_SizeBytes;
+
+const HWRegs_Expansion1BaseAddress_Offset = 0x1f801000;
+const HWRegs_Expansion2BaseAddress_Offset = 0x1f801004;
 
 const HWRegs_InterruptStatus_Offset = 0x1f801070;
 const HWRegs_InterruptMask_Offset = 0x1f801074;
@@ -276,6 +283,10 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
                             std.debug.print("FIXME Interrupt load ignored\n", .{});
                             return 0;
                         },
+                        HWRegs_DMA_Offset...HWRegs_DMA_OffsetEnd - 1 => {
+                            std.debug.print("FIXME DMA load ignored\n", .{});
+                            return 0;
+                        },
                         else => unreachable,
                     }
                 },
@@ -290,7 +301,7 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    std.debug.print("FIXME load ignored at cache control offset 0x{x:0>8}\n", .{address_u32});
+                    std.debug.print("FIXME load ignored at cache control offset\n", .{});
                     return 0;
                 },
                 else => unreachable,
@@ -334,7 +345,7 @@ pub fn store_mem_u8(psx: *PSXState, address_u32: u32, value: u8) void {
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
+                    std.debug.print("FIXME store ignored at offset\n", .{});
                 },
                 else => unreachable,
             }
@@ -380,7 +391,7 @@ pub fn store_mem_u16(psx: *PSXState, address_u32: u32, value: u16) void {
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
+                    std.debug.print("FIXME store ignored at offset\n", .{});
                 },
                 else => unreachable,
             }
@@ -410,17 +421,18 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
                     std.mem.writeInt(u32, u32_slice[0..4], value, .little);
                 },
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
-                    const local_offset: u13 = @intCast(offset - HWRegs_Offset);
-                    const local_offset_typed: HWRegOffsets = @enumFromInt(local_offset);
-                    switch (local_offset_typed) {
-                        .Expansion1BaseAddress, .Expansion2BaseAddress => {
-                            std.debug.print("FIXME store ignored to expansion register 0x{x:0>8}\n", .{local_offset});
+                    switch (offset) {
+                        HWRegs_Expansion1BaseAddress_Offset, HWRegs_Expansion2BaseAddress_Offset => {
+                            std.debug.print("FIXME store ignored to expansion register\n", .{});
                         },
-                        .InterruptStatus, .InterruptMask => {
-                            std.debug.print("FIXME store ignored to IRQ register 0x{x:0>8}\n", .{local_offset});
+                        HWRegs_InterruptMask_Offset, HWRegs_InterruptStatus_Offset => {
+                            std.debug.print("FIXME store ignored to IRQ register\n", .{});
+                        },
+                        HWRegs_DMA_Offset...HWRegs_DMA_OffsetEnd - 1 => {
+                            std.debug.print("FIXME DMA store ignored\n", .{});
                         },
                         else => {
-                            std.debug.print("FIXME store ignored at local offset 0x{x:0>8}\n", .{local_offset});
+                            std.debug.print("FIXME store ignored at local offset\n", .{});
                         },
                     }
                 },
@@ -431,7 +443,7 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    std.debug.print("FIXME store ignored at offset 0x{x:0>8}\n", .{address_u32});
+                    std.debug.print("FIXME store ignored at offset\n", .{});
                 },
                 else => unreachable,
             }
@@ -471,11 +483,3 @@ pub fn execute(psx: *PSXState) void {
         std.mem.copyForwards(u32, &psx.registers.r_in, &psx.registers.r_out);
     }
 }
-
-const HWRegOffsets = enum(u13) {
-    Expansion1BaseAddress = 0,
-    Expansion2BaseAddress = 4,
-    InterruptStatus = HWRegs_InterruptStatus_Offset - HWRegs_Offset,
-    InterruptMask = HWRegs_InterruptMask_Offset - HWRegs_Offset,
-    _,
-};
