@@ -78,6 +78,10 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
                             std.debug.print("FIXME SPU load ignored\n", .{});
                             return 0;
                         },
+                        HWRegs_GPUREAD_G0_Offset, HWRegs_GPUSTAT_G1_Offset => {
+                            std.debug.print("FIXME GPU load ignored\n", .{});
+                            return 0;
+                        },
                         else => unreachable,
                     }
                 },
@@ -156,6 +160,9 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
                         HWRegs_SPU_Offset...HWRegs_SPU_OffsetEnd - 1 => {
                             std.debug.print("FIXME SPU store ignored\n", .{});
                         },
+                        HWRegs_GPUREAD_G0_Offset, HWRegs_GPUSTAT_G1_Offset => {
+                            std.debug.print("FIXME GPU store ignored\n", .{});
+                        },
                         HWRegs_UnknownDebug_Offset => {
                             std.debug.print("FIXME debug store ignored\n", .{});
                         },
@@ -228,6 +235,9 @@ const HWRegs_Timers_OffsetEnd = HWRegs_Timers_Offset + HWRegs_Timers_SizeBytes;
 const HWRegs_SPU_SizeBytes = 640;
 const HWRegs_SPU_Offset = 0x1f801c00;
 const HWRegs_SPU_OffsetEnd = HWRegs_SPU_Offset + HWRegs_SPU_SizeBytes;
+
+const HWRegs_GPUREAD_G0_Offset = 0x1f801810;
+const HWRegs_GPUSTAT_G1_Offset = 0x1f801814;
 
 const HWRegs_UnknownDebug_Offset = 0x1f802041;
 
