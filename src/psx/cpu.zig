@@ -49,6 +49,8 @@ const CacheControl_Offset = 0x1ffe0130;
 
 pub const PSXState = struct {
     registers: Registers = .{},
+    branch: bool = false,
+    delay_slot: bool = false,
     bios: [BIOS_SizeBytes]u8,
     ram: []u8,
 };
@@ -450,6 +452,9 @@ pub fn execute(psx: *PSXState) void {
         const instruction = instructions.decode_instruction(op_code);
 
         debug.print_instruction(op_code, instruction);
+
+        psx.delay_slot = psx.branch;
+        psx.branch = false;
 
         execution.execute_instruction(psx, instruction);
 

@@ -342,7 +342,7 @@ fn decode_cop0_instruction(op_u32: u32) Instruction {
             0b010000 => return .{ .rfe = undefined },
             else => unreachable,
         },
-        else => unreachable,
+        _ => unreachable,
     }
 }
 

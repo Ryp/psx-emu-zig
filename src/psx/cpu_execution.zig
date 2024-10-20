@@ -574,20 +574,27 @@ fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
 }
 
 fn execute_generic_jump(psx: *PSXState, address: u32) void {
+    psx.branch = true;
     psx.registers.next_pc = address;
 }
 
 fn execute_generic_branch(psx: *PSXState, offset: i32) void {
+    psx.branch = true;
     psx.registers.next_pc = wrapping_add_u32_i32(psx.registers.pc, offset);
 }
 
 fn execute_exception(psx: *PSXState, cause: cpu.ExceptionCause) void {
-    psx.registers.epc = psx.registers.current_instruction_pc;
-
-    psx.registers.sr.interrupt_stack <<= 2;
-
     psx.registers.cause = @bitCast(@as(u32, 0));
     psx.registers.cause.cause = cause;
+    psx.registers.cause.branch_delay = if (psx.delay_slot) 1 else 0;
+
+    psx.registers.epc = psx.registers.current_instruction_pc;
+
+    if (psx.delay_slot) {
+        psx.registers.epc -%= 4;
+    }
+
+    psx.registers.sr.interrupt_stack <<= 2;
 
     psx.registers.pc = if (psx.registers.sr.bev == 1) 0xbfc00180 else 0x80000080;
     psx.registers.next_pc = psx.registers.pc +% 4;
