@@ -496,9 +496,17 @@ fn execute_lb(psx: *PSXState, instruction: instructions.lb) void {
 }
 
 fn execute_lh(psx: *PSXState, instruction: instructions.lh) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+
+    if (address % 2 == 0) {
+        const value: i16 = @bitCast(io.load_mem_u16(psx, address);
+        const value_sign_extended: i32 = value;
+
+        psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
+    } else {
+        execute_exception(psx, .AdEL);
+    }
 }
 
 fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
