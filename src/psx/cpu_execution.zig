@@ -1,9 +1,11 @@
 const std = @import("std");
 
-const instructions = @import("cpu_instructions.zig");
 const cpu = @import("cpu.zig");
 const PSXState = cpu.PSXState;
 const Registers = cpu.Registers;
+
+const instructions = @import("cpu_instructions.zig");
+const io = @import("cpu_io.zig");
 
 pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) void {
     switch (instruction) {
@@ -455,7 +457,7 @@ fn execute_lb(psx: *PSXState, instruction: instructions.lb) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    const value: i8 = @bitCast(cpu.load_mem_u8(psx, address));
+    const value: i8 = @bitCast(io.load_mem_u8(psx, address));
     const value_sign_extended: i32 = value;
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
@@ -484,7 +486,7 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 4 == 0) {
-        const value = cpu.load_mem_u32(psx, address);
+        const value = io.load_mem_u32(psx, address);
 
         psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
     } else {
@@ -496,7 +498,7 @@ fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    const value: u8 = cpu.load_mem_u8(psx, address);
+    const value: u8 = io.load_mem_u8(psx, address);
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
 }
@@ -513,7 +515,7 @@ fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    cpu.store_mem_u8(psx, address, @truncate(value));
+    io.store_mem_u8(psx, address, @truncate(value));
 }
 
 fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
@@ -523,7 +525,7 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 2 == 0) {
-        cpu.store_mem_u16(psx, address, @truncate(value));
+        io.store_mem_u16(psx, address, @truncate(value));
     } else {
         execute_exception(psx, .AdES);
     }
@@ -548,7 +550,7 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 4 == 0) {
-        cpu.store_mem_u32(psx, address, value);
+        io.store_mem_u32(psx, address, value);
     } else {
         execute_exception(psx, .AdES);
     }
