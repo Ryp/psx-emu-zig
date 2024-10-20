@@ -214,9 +214,13 @@ fn execute_add(psx: *PSXState, instruction: instructions.add) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    const result = execute_generic_add(psx, value_s, @bitCast(value_t));
+    const result, const overflow = execute_generic_add_with_overflow(value_s, @bitCast(value_t));
 
-    store_reg(&psx.registers, instruction.rd, result);
+    if (overflow) {
+        execute_exception(psx, .Ov);
+    } else {
+        store_reg(&psx.registers, instruction.rd, result);
+    }
 }
 
 fn execute_addu(psx: *PSXState, instruction: instructions.addu) void {
@@ -390,9 +394,13 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
 fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
     const value_s = load_reg(psx.registers, instruction.rs);
 
-    const result = execute_generic_add(psx, value_s, instruction.imm_i16);
+    const result, const overflow = execute_generic_add_with_overflow(value_s, instruction.imm_i16);
 
-    store_reg(&psx.registers, instruction.rt, result);
+    if (overflow) {
+        execute_exception(psx, .Ov);
+    } else {
+        store_reg(&psx.registers, instruction.rt, result);
+    }
 }
 
 fn execute_addiu(psx: *PSXState, instruction: instructions.addiu) void {
@@ -554,7 +562,7 @@ fn execute_rfe(psx: *PSXState) void {
     psx.registers.sr.interrupt_stack >>= 2;
 }
 
-fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
+fn execute_generic_add_with_overflow(lhs: u32, rhs: i32) struct { u32, bool } {
     var result: u32 = undefined;
     var overflow: u1 = undefined;
 
@@ -565,12 +573,7 @@ fn execute_generic_add(psx: *PSXState, lhs: u32, rhs: i32) u32 {
         result, overflow = @subWithOverflow(lhs, @as(u32, @intCast(-rhs)));
     }
 
-    if (overflow == 1) {
-        _ = psx; // FIXME
-        unreachable;
-    }
-
-    return result;
+    return .{ result, overflow != 0 };
 }
 
 fn execute_generic_jump(psx: *PSXState, address: u32) void {
