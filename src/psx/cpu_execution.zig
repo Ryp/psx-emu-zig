@@ -536,9 +536,16 @@ fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
 }
 
 fn execute_lhu(psx: *PSXState, instruction: instructions.lhu) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+
+    if (address % 2 == 0) {
+        const value = io.load_mem_u16(psx, address);
+
+        psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+    } else {
+        execute_exception(psx, .AdEL);
+    }
 }
 
 fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
