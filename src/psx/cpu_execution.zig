@@ -206,9 +206,13 @@ fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
 }
 
 fn execute_multu(psx: *PSXState, instruction: instructions.multu) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const a: u64 = load_reg(psx.registers, instruction.rs);
+    const b: u64 = load_reg(psx.registers, instruction.rt);
+
+    const result = a * b;
+
+    psx.registers.hi = @truncate(result >> 32);
+    psx.registers.lo = @truncate(result);
 }
 
 fn execute_div(psx: *PSXState, instruction: instructions.div) void {
