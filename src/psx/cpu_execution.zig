@@ -495,12 +495,21 @@ fn execute_lb(psx: *PSXState, instruction: instructions.lb) void {
     psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
 }
 
+fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+
+    const value: u8 = io.load_mem_u8(psx, address);
+
+    psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+}
+
 fn execute_lh(psx: *PSXState, instruction: instructions.lh) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 2 == 0) {
-        const value: i16 = @bitCast(io.load_mem_u16(psx, address);
+        const value: i16 = @bitCast(io.load_mem_u16(psx, address));
         const value_sign_extended: i32 = value;
 
         psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
@@ -509,16 +518,17 @@ fn execute_lh(psx: *PSXState, instruction: instructions.lh) void {
     }
 }
 
-fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
-}
+fn execute_lhu(psx: *PSXState, instruction: instructions.lhu) void {
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-fn execute_lwr(psx: *PSXState, instruction: instructions.lwr) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    if (address % 2 == 0) {
+        const value = io.load_mem_u16(psx, address);
+
+        psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+    } else {
+        execute_exception(psx, .AdEL);
+    }
 }
 
 fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
@@ -534,26 +544,16 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     }
 }
 
-fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
-    const address_base = load_reg(psx.registers, instruction.rs);
-    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
-
-    const value: u8 = io.load_mem_u8(psx, address);
-
-    psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
-fn execute_lhu(psx: *PSXState, instruction: instructions.lhu) void {
-    const address_base = load_reg(psx.registers, instruction.rs);
-    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
-
-    if (address % 2 == 0) {
-        const value = io.load_mem_u16(psx, address);
-
-        psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
-    } else {
-        execute_exception(psx, .AdEL);
-    }
+fn execute_lwr(psx: *PSXState, instruction: instructions.lwr) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
@@ -578,18 +578,6 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     }
 }
 
-fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
-}
-
-fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
-}
-
 fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const value = load_reg(psx.registers, instruction.rt);
 
@@ -601,6 +589,18 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     } else {
         execute_exception(psx, .AdES);
     }
+}
+
+fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
