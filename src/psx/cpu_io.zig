@@ -74,6 +74,10 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
                             std.debug.print("FIXME DMA load ignored\n", .{});
                             return 0;
                         },
+                        HWRegs_SPU_Offset...HWRegs_SPU_OffsetEnd - 1 => {
+                            std.debug.print("FIXME SPU load ignored\n", .{});
+                            return 0;
+                        },
                         else => unreachable,
                     }
                 },
