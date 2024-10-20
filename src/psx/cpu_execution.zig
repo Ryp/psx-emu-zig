@@ -483,9 +483,13 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    const value = cpu.load_mem_u32(psx, address);
+    if (address % 4 == 0) {
+        const value = cpu.load_mem_u32(psx, address);
 
-    psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+        psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
+    } else {
+        execute_exception(psx, .AdEL);
+    }
 }
 
 fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
@@ -518,7 +522,11 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    cpu.store_mem_u16(psx, address, @truncate(value));
+    if (address % 2 == 0) {
+        cpu.store_mem_u16(psx, address, @truncate(value));
+    } else {
+        execute_exception(psx, .AdES);
+    }
 }
 
 fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
@@ -539,7 +547,11 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    cpu.store_mem_u32(psx, address, value);
+    if (address % 4 == 0) {
+        cpu.store_mem_u32(psx, address, value);
+    } else {
+        execute_exception(psx, .AdES);
+    }
 }
 
 fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
@@ -586,7 +598,7 @@ fn execute_generic_branch(psx: *PSXState, offset: i32) void {
     psx.registers.next_pc = wrapping_add_u32_i32(psx.registers.pc, offset);
 }
 
-fn execute_exception(psx: *PSXState, cause: cpu.ExceptionCause) void {
+pub fn execute_exception(psx: *PSXState, cause: cpu.ExceptionCause) void {
     psx.registers.cause = @bitCast(@as(u32, 0));
     psx.registers.cause.cause = cause;
     psx.registers.cause.branch_delay = if (psx.delay_slot) 1 else 0;

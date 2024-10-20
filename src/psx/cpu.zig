@@ -260,7 +260,7 @@ pub fn load_mem_u32(psx: *PSXState, address_u32: u32) u32 {
 
     const address: PSXAddress = @bitCast(address_u32);
 
-    std.debug.assert(address.offset % 4 == 0); // FIXME implement bus errors
+    std.debug.assert(address.offset % 4 == 0);
 
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
@@ -353,7 +353,7 @@ pub fn store_mem_u16(psx: *PSXState, address_u32: u32, value: u16) void {
 
     const address: PSXAddress = @bitCast(address_u32);
 
-    std.debug.assert(address.offset % 2 == 0); // FIXME implement bus errors
+    std.debug.assert(address.offset % 2 == 0);
 
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
@@ -394,7 +394,7 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 
     const address: PSXAddress = @bitCast(address_u32);
 
-    std.debug.assert(address.offset % 4 == 0); // FIXME implement bus errors
+    std.debug.assert(address.offset % 4 == 0);
 
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
@@ -437,6 +437,11 @@ pub fn store_mem_u32(psx: *PSXState, address_u32: u32, value: u32) void {
 pub fn execute(psx: *PSXState) void {
     while (true) {
         psx.registers.current_instruction_pc = psx.registers.pc;
+
+        if (psx.registers.pc % 4 != 0) {
+            execution.execute_exception(psx, .AdEL);
+            continue;
+        }
 
         const op_code = load_mem_u32(psx, psx.registers.pc);
 
