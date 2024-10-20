@@ -1,10 +1,5 @@
 const std = @import("std");
 
-const debug = @import("cpu_debug.zig");
-const execution = @import("cpu_execution.zig");
-const instructions = @import("cpu_instructions.zig");
-const io = @import("cpu_io.zig");
-
 pub const RAM_SizeBytes = 2 * 1024 * 1024;
 pub const BIOS_SizeBytes = 512 * 1024;
 
@@ -28,39 +23,6 @@ pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) 
 
 pub fn destroy_psx_state(psx: *PSXState, allocator: std.mem.Allocator) void {
     allocator.free(psx.ram);
-}
-
-pub fn execute(psx: *PSXState) void {
-    while (true) {
-        psx.registers.current_instruction_pc = psx.registers.pc;
-
-        if (psx.registers.pc % 4 != 0) {
-            execution.execute_exception(psx, .AdEL);
-            continue;
-        }
-
-        const op_code = io.load_mem_u32(psx, psx.registers.pc);
-
-        psx.registers.pc = psx.registers.next_pc;
-        psx.registers.next_pc +%= 4;
-
-        // Execute any pending memory loads
-        if (psx.registers.pending_load) |pending_load| {
-            execution.store_reg(&psx.registers, pending_load.register, pending_load.value);
-            psx.registers.pending_load = null;
-        }
-
-        const instruction = instructions.decode_instruction(op_code);
-
-        debug.print_instruction(op_code, instruction);
-
-        psx.delay_slot = psx.branch;
-        psx.branch = false;
-
-        execution.execute_instruction(psx, instruction);
-
-        std.mem.copyForwards(u32, &psx.registers.r_in, &psx.registers.r_out);
-    }
 }
 
 // Register Name Conventional use

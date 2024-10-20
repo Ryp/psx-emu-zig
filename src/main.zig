@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const cpu = @import("psx/cpu.zig");
+const execution = @import("psx/cpu_execution.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -36,5 +37,7 @@ pub fn main() !void {
     var psx = try cpu.create_psx_state(bios_buffer, allocator);
     defer cpu.destroy_psx_state(&psx, allocator);
 
-    cpu.execute(&psx);
+    while (true) {
+        execution.step(&psx);
+    }
 }

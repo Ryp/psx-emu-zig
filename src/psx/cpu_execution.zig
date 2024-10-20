@@ -5,9 +5,41 @@ const PSXState = cpu.PSXState;
 const Registers = cpu.Registers;
 
 const instructions = @import("cpu_instructions.zig");
+const debug = @import("cpu_debug.zig");
 const io = @import("cpu_io.zig");
 
-pub fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) void {
+pub fn step(psx: *PSXState) void {
+    psx.registers.current_instruction_pc = psx.registers.pc;
+
+    if (psx.registers.pc % 4 != 0) {
+        execute_exception(psx, .AdEL);
+        return;
+    }
+
+    const op_code = io.load_mem_u32(psx, psx.registers.pc);
+
+    psx.registers.pc = psx.registers.next_pc;
+    psx.registers.next_pc +%= 4;
+
+    // Execute any pending memory loads
+    if (psx.registers.pending_load) |pending_load| {
+        store_reg(&psx.registers, pending_load.register, pending_load.value);
+        psx.registers.pending_load = null;
+    }
+
+    const instruction = instructions.decode_instruction(op_code);
+
+    debug.print_instruction(op_code, instruction);
+
+    psx.delay_slot = psx.branch;
+    psx.branch = false;
+
+    execute_instruction(psx, instruction);
+
+    std.mem.copyForwards(u32, &psx.registers.r_in, &psx.registers.r_out);
+}
+
+fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) void {
     switch (instruction) {
         .sll => |i| execute_sll(psx, i),
         .srl => |i| execute_srl(psx, i),
@@ -84,7 +116,7 @@ fn load_reg(registers: Registers, register_name: cpu.RegisterName) u32 {
     return value;
 }
 
-pub fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
+fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
     std.debug.print("reg store 0x{x:0>8} in {}\n", .{ value, register_name });
 
     switch (register_name) {
@@ -600,7 +632,7 @@ fn execute_generic_branch(psx: *PSXState, offset: i32) void {
     psx.registers.next_pc = wrapping_add_u32_i32(psx.registers.pc, offset);
 }
 
-pub fn execute_exception(psx: *PSXState, cause: cpu.ExceptionCause) void {
+fn execute_exception(psx: *PSXState, cause: cpu.ExceptionCause) void {
     psx.registers.cause = @bitCast(@as(u32, 0));
     psx.registers.cause.cause = cause;
     psx.registers.cause.branch_delay = if (psx.delay_slot) 1 else 0;
