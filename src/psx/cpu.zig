@@ -358,6 +358,11 @@ pub fn store_mem_u16(psx: *PSXState, address_u32: u32, value: u16) void {
     switch (address.mapping) {
         .Useg, .Seg0, .Seg1 => {
             switch (address.offset) {
+                RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
+                    const local_offset = offset - RAM_Offset;
+                    const u16_slice = psx.ram[local_offset..];
+                    std.mem.writeInt(u16, u16_slice[0..2], value, .little);
+                },
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     switch (offset) {
                         HWRegs_Timers_Offset...HWRegs_Timers_OffsetEnd - 1 => {
