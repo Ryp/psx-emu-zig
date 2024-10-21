@@ -101,7 +101,7 @@ fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) vo
         .sw => |i| execute_sw(psx, i),
         .swr => |i| execute_swr(psx, i),
 
-        .invalid => unreachable,
+        .invalid => execute_reserved_instruction(psx),
     }
 }
 
@@ -638,6 +638,10 @@ fn execute_generic_add_with_overflow(lhs: u32, rhs: i32) struct { u32, bool } {
     }
 
     return .{ result, overflow != 0 };
+}
+
+fn execute_reserved_instruction(psx: *PSXState) void {
+    execute_exception(psx, .RI);
 }
 
 fn execute_generic_jump(psx: *PSXState, address: u32) void {
