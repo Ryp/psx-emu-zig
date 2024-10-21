@@ -195,8 +195,7 @@ fn execute_syscall(psx: *PSXState) void {
 }
 
 fn execute_break(psx: *PSXState) void {
-    _ = psx;
-    unreachable;
+    execute_exception(psx, .BP);
 }
 
 fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
