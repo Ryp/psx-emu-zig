@@ -74,7 +74,7 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .sw => |i| print_i_mem_instruction("sw", i),
         .swr => |i| print_i_mem_instruction("swr", i),
 
-        .invalid => unreachable,
+        .invalid => std.debug.print("ill\n", .{}),
     }
 }
 
