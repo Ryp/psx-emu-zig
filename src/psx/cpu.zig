@@ -1,8 +1,5 @@
 const std = @import("std");
 
-pub const RAM_SizeBytes = 2 * 1024 * 1024;
-pub const BIOS_SizeBytes = 512 * 1024;
-
 pub const PSXState = struct {
     registers: Registers = .{},
     branch: bool = false,
@@ -24,6 +21,24 @@ pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) 
 pub fn destroy_psx_state(psx: *PSXState, allocator: std.mem.Allocator) void {
     allocator.free(psx.ram);
 }
+
+pub const RAM_SizeBytes = 2 * 1024 * 1024;
+pub const BIOS_SizeBytes = 512 * 1024;
+
+pub const Registers = struct {
+    pc: u32 = 0xbfc00000, // Program Counter
+    next_pc: u32 = 0xbfc00000 + 4, // Pipelined Program Counter
+    current_instruction_pc: u32 = undefined,
+    epc: u32 = undefined, // Exception Program Counter
+
+    r_in: [32]u32 = undefined, // FIXME does it have an initial value?
+    r_out: [32]u32 = undefined, // FIXME does it have an initial value?
+    hi: u32 = undefined, // FIXME does it have an initial value?
+    lo: u32 = undefined, // FIXME does it have an initial value?
+    sr: SystemRegister = undefined, // FIXME does it have an initial value?
+    cause: CauseRegister = undefined, // FIXME does it have an initial value?
+    pending_load: ?struct { register: RegisterName, value: u32 } = null,
+};
 
 // Register Name Conventional use
 pub const RegisterName = enum(u5) {
@@ -59,21 +74,6 @@ pub const RegisterName = enum(u5) {
     sp = 29, // Stack pointer
     fp = 30, // Frame pointer
     ra = 31, // Function return address
-};
-
-pub const Registers = struct {
-    pc: u32 = 0xbfc00000, // Program Counter
-    next_pc: u32 = 0xbfc00000 + 4, // Pipelined Program Counter
-    current_instruction_pc: u32 = undefined,
-    epc: u32 = undefined, // Exception Program Counter
-
-    r_in: [32]u32 = undefined, // FIXME does it have an initial value?
-    r_out: [32]u32 = undefined, // FIXME does it have an initial value?
-    hi: u32 = undefined, // FIXME does it have an initial value?
-    lo: u32 = undefined, // FIXME does it have an initial value?
-    sr: SystemRegister = undefined, // FIXME does it have an initial value?
-    cause: CauseRegister = undefined, // FIXME does it have an initial value?
-    pending_load: ?struct { register: RegisterName, value: u32 } = null,
 };
 
 const SystemRegister = packed struct {
