@@ -74,6 +74,15 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .sw => |i| print_i_mem_instruction("sw", i),
         .swr => |i| print_i_mem_instruction("swr", i),
 
+        .lwc0 => std.debug.print("lwc0\n", .{}),
+        .lwc1 => std.debug.print("lwc1\n", .{}),
+        .lwc2 => std.debug.print("lwc2\n", .{}),
+        .lwc3 => std.debug.print("lwc3\n", .{}),
+        .swc0 => std.debug.print("swc0\n", .{}),
+        .swc1 => std.debug.print("swc1\n", .{}),
+        .swc2 => std.debug.print("swc2\n", .{}),
+        .swc3 => std.debug.print("swc3\n", .{}),
+
         .invalid => std.debug.print("ill\n", .{}),
     }
 }

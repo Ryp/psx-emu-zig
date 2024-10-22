@@ -104,6 +104,15 @@ fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) vo
         .sw => |i| execute_sw(psx, i),
         .swr => |i| execute_swr(psx, i),
 
+        .lwc0 => unreachable,
+        .lwc1 => unreachable,
+        .lwc2 => unreachable,
+        .lwc3 => unreachable,
+        .swc0 => unreachable,
+        .swc1 => unreachable,
+        .swc2 => unreachable,
+        .swc3 => unreachable,
+
         .invalid => execute_reserved_instruction(psx),
     }
 }

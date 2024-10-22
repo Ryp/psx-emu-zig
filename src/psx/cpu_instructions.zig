@@ -109,6 +109,14 @@ pub const Instruction = union(enum) {
     swl: swl,
     sw: sw,
     swr: swr,
+    lwc0,
+    lwc1,
+    lwc2,
+    lwc3,
+    swc0,
+    swc1,
+    swc2,
+    swc3,
     invalid,
 };
 
@@ -168,9 +176,9 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .XORI => .{ .xori = decode_generic_rs_rt_imm_u16(op_u32) },
         .LUI => .{ .lui = decode_generic_rt_imm_u16(op_u32) },
         .COP0 => decode_cop0_instruction(op_u32),
-        .COP1 => decode_cop1_instruction(op_u32),
-        .COP2 => decode_cop2_instruction(op_u32),
-        .COP3 => decode_cop3_instruction(op_u32),
+        .COP1 => .{ .cop1 = undefined },
+        .COP2 => .{ .cop2 = undefined },
+        .COP3 => .{ .cop3 = undefined },
         .LB => .{ .lb = decode_generic_rs_rt_imm_i16(op_u32) },
         .LH => .{ .lh = decode_generic_rs_rt_imm_i16(op_u32) },
         .LWL => .{ .lwl = decode_generic_rs_rt_imm_i16(op_u32) },
@@ -183,14 +191,14 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .SWL => .{ .swl = decode_generic_rs_rt_imm_i16(op_u32) },
         .SW => .{ .sw = decode_generic_rs_rt_imm_i16(op_u32) },
         .SWR => .{ .swr = decode_generic_rs_rt_imm_i16(op_u32) },
-        .LWC0 => unreachable,
-        .LWC1 => unreachable,
-        .LWC2 => unreachable,
-        .LWC3 => unreachable,
-        .SWC0 => unreachable,
-        .SWC1 => unreachable,
-        .SWC2 => unreachable,
-        .SWC3 => unreachable,
+        .LWC0 => .{ .lwc0 = undefined },
+        .LWC1 => .{ .lwc1 = undefined },
+        .LWC2 => .{ .lwc2 = undefined },
+        .LWC3 => .{ .lwc3 = undefined },
+        .SWC0 => .{ .swc0 = undefined },
+        .SWC1 => .{ .swc1 = undefined },
+        .SWC2 => .{ .swc2 = undefined },
+        .SWC3 => .{ .swc3 = undefined },
         _ => .{ .invalid = undefined },
     };
 }
@@ -347,21 +355,6 @@ fn decode_cop0_instruction(op_u32: u32) Instruction {
         },
         _ => unreachable,
     }
-}
-
-fn decode_cop1_instruction(op_u32: u32) Instruction {
-    _ = op_u32;
-    return .{ .cop1 = undefined };
-}
-
-fn decode_cop2_instruction(op_u32: u32) Instruction {
-    _ = op_u32;
-    return .{ .cop2 = undefined };
-}
-
-fn decode_cop3_instruction(op_u32: u32) Instruction {
-    _ = op_u32;
-    return .{ .cop3 = undefined };
 }
 
 pub const generic_rd = struct {
