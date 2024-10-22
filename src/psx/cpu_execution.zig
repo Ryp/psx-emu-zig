@@ -56,6 +56,9 @@ fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) vo
         .mflo => |i| execute_mflo(psx, i),
         .mtlo => |i| execute_mtlo(psx, i),
         .rfe => execute_rfe(psx),
+        .cop1 => execute_cop1(psx),
+        .cop2 => execute_cop2(psx),
+        .cop3 => execute_cop3(psx),
         .mult => |i| execute_mult(psx, i),
         .multu => |i| execute_multu(psx, i),
         .div => |i| execute_div(psx, i),
@@ -624,6 +627,21 @@ fn execute_mtlo(psx: *PSXState, instruction: instructions.mtlo) void {
 
 fn execute_rfe(psx: *PSXState) void {
     psx.registers.sr.interrupt_stack >>= 2;
+}
+
+fn execute_cop1(psx: *PSXState) void {
+    _ = psx;
+    unreachable;
+}
+
+fn execute_cop2(psx: *PSXState) void {
+    _ = psx;
+    unreachable;
+}
+
+fn execute_cop3(psx: *PSXState) void {
+    _ = psx;
+    unreachable;
 }
 
 fn execute_generic_add_with_overflow(lhs: u32, rhs: i32) struct { u32, bool } {

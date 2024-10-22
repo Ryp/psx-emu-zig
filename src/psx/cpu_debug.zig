@@ -24,6 +24,9 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .mflo => |i| print_generic_rd("mflo", i),
         .mtlo => |i| print_generic_rd("mtlo", i),
         .rfe => std.debug.print("rfe\n", .{}),
+        .cop1 => std.debug.print("cop1\n", .{}),
+        .cop2 => std.debug.print("cop2\n", .{}),
+        .cop3 => std.debug.print("cop3\n", .{}),
 
         .mult => |i| print_generic_rs_rt("mult", i),
         .multu => |i| print_generic_rs_rt("multu", i),
@@ -72,6 +75,22 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .swr => |i| print_i_mem_instruction("swr", i),
 
         .invalid => unreachable,
+    }
+}
+
+pub fn print_bios_disasm(bios: []u8) void {
+    const instruction_count = bios.len / 4;
+
+    for (0..instruction_count) |instruction_index| {
+        const op_offset = instruction_index * 4;
+        const op_slice = bios[op_offset..];
+        const op_code = std.mem.readInt(u32, op_slice[0..4], .little);
+
+        std.debug.print("0x{x:0>8} | ", .{op_offset});
+
+        const instruction = instructions.decode_instruction(op_code);
+
+        print_instruction(op_code, instruction);
     }
 }
 

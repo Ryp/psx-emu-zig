@@ -86,6 +86,9 @@ pub const Instruction = union(enum) {
     mfc0: mfc0,
     mtc0: mtc0,
     rfe,
+    cop1,
+    cop2,
+    cop3,
     addi: addi,
     addiu: addiu,
     slti: slti,
@@ -165,9 +168,9 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .XORI => .{ .xori = decode_generic_rs_rt_imm_u16(op_u32) },
         .LUI => .{ .lui = decode_generic_rt_imm_u16(op_u32) },
         .COP0 => decode_cop0_instruction(op_u32),
-        .COP1 => unreachable,
-        .COP2 => unreachable,
-        .COP3 => unreachable,
+        .COP1 => decode_cop1_instruction(op_u32),
+        .COP2 => decode_cop2_instruction(op_u32),
+        .COP3 => decode_cop3_instruction(op_u32),
         .LB => .{ .lb = decode_generic_rs_rt_imm_i16(op_u32) },
         .LH => .{ .lh = decode_generic_rs_rt_imm_i16(op_u32) },
         .LWL => .{ .lwl = decode_generic_rs_rt_imm_i16(op_u32) },
@@ -344,6 +347,21 @@ fn decode_cop0_instruction(op_u32: u32) Instruction {
         },
         _ => unreachable,
     }
+}
+
+fn decode_cop1_instruction(op_u32: u32) Instruction {
+    _ = op_u32;
+    return .{ .cop1 = undefined };
+}
+
+fn decode_cop2_instruction(op_u32: u32) Instruction {
+    _ = op_u32;
+    return .{ .cop2 = undefined };
+}
+
+fn decode_cop3_instruction(op_u32: u32) Instruction {
+    _ = op_u32;
+    return .{ .cop3 = undefined };
 }
 
 pub const generic_rd = struct {
