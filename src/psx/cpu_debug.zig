@@ -3,9 +3,7 @@ const std = @import("std");
 const instructions = @import("cpu_instructions.zig");
 const cpu = @import("cpu.zig");
 
-pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) void {
-    std.debug.print("0b{b:0>32} 0x{x:0>8} ", .{ op_code, op_code });
-
+pub fn print_instruction(instruction: instructions.Instruction) void {
     switch (instruction) {
         .sll => |i| print_shift_instruction("sll", i),
         .srl => |i| print_shift_instruction("srl", i),
@@ -51,8 +49,11 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .blez => |i| print_branch_2_instruction("blez", i),
         .bgtz => |i| print_branch_2_instruction("bgtz", i),
 
-        .mfc0 => |i| print_mfc0_instruction(i),
-        .mtc0 => |i| print_mtc0_instruction(i),
+        .mfc => |i| print_cop_move_copy_instruction("mfc", i),
+        .cfc => |i| print_cop_move_copy_instruction("cfc", i),
+        .mtc => |i| print_cop_move_copy_instruction("mtc", i),
+        .ctc => |i| print_cop_move_copy_instruction("ctc", i),
+        .bcn => |i| print_cop_bcn(i),
         .addi => |i| print_i_signed_instruction("addi", i),
         .addiu => |i| print_i_signed_instruction("addiu", i),
         .slti => |i| print_i_signed_instruction("slti", i),
@@ -74,14 +75,8 @@ pub fn print_instruction(op_code: u32, instruction: instructions.Instruction) vo
         .sw => |i| print_i_mem_instruction("sw", i),
         .swr => |i| print_i_mem_instruction("swr", i),
 
-        .lwc0 => std.debug.print("lwc0\n", .{}),
-        .lwc1 => std.debug.print("lwc1\n", .{}),
-        .lwc2 => std.debug.print("lwc2\n", .{}),
-        .lwc3 => std.debug.print("lwc3\n", .{}),
-        .swc0 => std.debug.print("swc0\n", .{}),
-        .swc1 => std.debug.print("swc1\n", .{}),
-        .swc2 => std.debug.print("swc2\n", .{}),
-        .swc3 => std.debug.print("swc3\n", .{}),
+        .lwc => |i| print_cop_load_store("lwc", i),
+        .swc => |i| print_cop_load_store("swc", i),
 
         .invalid => std.debug.print("ill\n", .{}),
     }
@@ -97,9 +92,11 @@ pub fn print_bios_disasm(bios: []u8) void {
 
         std.debug.print("0x{x:0>8} | ", .{op_offset});
 
+        std.debug.print("0b{b:0>32} 0x{x:0>8} ", .{ op_code, op_code });
+
         const instruction = instructions.decode_instruction(op_code);
 
-        print_instruction(op_code, instruction);
+        print_instruction(instruction);
     }
 }
 
@@ -163,18 +160,15 @@ fn print_ralu_instruction(op_name: [:0]const u8, instruction: instructions.gener
     std.debug.print("{s} ${}, ${}, ${}\n", .{ op_name, instruction.rd, instruction.rt, instruction.rs });
 }
 
-fn print_mfc0_instruction(instruction: instructions.mfc0) void {
-    switch (instruction.target) {
-        else => {
-            std.debug.print("mfc0 ${}, {}\n", .{ instruction.cpu_rs, instruction.target });
-        },
-    }
+// FIXME Copy and move probably don't have the same way of printing
+fn print_cop_move_copy_instruction(op_name: [:0]const u8, instruction: instructions.generic_cop_mov) void {
+    std.debug.print("{s}{} ${}, {}\n", .{ op_name, instruction.cop_index, instruction.cpu_rs, instruction.target });
 }
 
-fn print_mtc0_instruction(instruction: instructions.mtc0) void {
-    switch (instruction.target) {
-        else => {
-            std.debug.print("mtc0 ${}, {}\n", .{ instruction.cpu_rs, instruction.target });
-        },
-    }
+fn print_cop_bcn(instruction: instructions.generic_cop_bc) void {
+    std.debug.print("bc{}{s} {}\n", .{ instruction.cop_index, if (instruction.condition) "t" else "f", instruction.imm_u16 });
+}
+
+fn print_cop_load_store(op_name: [:0]const u8, instruction: instructions.generic_cop_load_store) void {
+    std.debug.print("{s}{} ${}, {}(${})\n", .{ op_name, instruction.cop_index, instruction.rt_cop, instruction.imm_i16, instruction.rs });
 }

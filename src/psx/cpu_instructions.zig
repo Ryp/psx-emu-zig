@@ -83,8 +83,11 @@ pub const Instruction = union(enum) {
     bne: bne,
     blez: blez,
     bgtz: bgtz,
-    mfc0: mfc0,
-    mtc0: mtc0,
+    mfc: mfc,
+    cfc: cfc,
+    mtc: mtc,
+    ctc: ctc,
+    bcn: bcn,
     rfe,
     cop1,
     cop2,
@@ -109,14 +112,8 @@ pub const Instruction = union(enum) {
     swl: swl,
     sw: sw,
     swr: swr,
-    lwc0,
-    lwc1,
-    lwc2,
-    lwc3,
-    swc0,
-    swc1,
-    swc2,
-    swc3,
+    lwc: lwc,
+    swc: swc,
     invalid,
 };
 
@@ -175,10 +172,7 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .ORI => .{ .ori = decode_generic_rs_rt_imm_u16(op_u32) },
         .XORI => .{ .xori = decode_generic_rs_rt_imm_u16(op_u32) },
         .LUI => .{ .lui = decode_generic_rt_imm_u16(op_u32) },
-        .COP0 => decode_cop0_instruction(op_u32),
-        .COP1 => .{ .cop1 = undefined },
-        .COP2 => .{ .cop2 = undefined },
-        .COP3 => .{ .cop3 = undefined },
+        .COP0, .COP1, .COP2, .COP3 => decode_cop_instruction(@bitCast(op_u32)),
         .LB => .{ .lb = decode_generic_rs_rt_imm_i16(op_u32) },
         .LH => .{ .lh = decode_generic_rs_rt_imm_i16(op_u32) },
         .LWL => .{ .lwl = decode_generic_rs_rt_imm_i16(op_u32) },
@@ -191,14 +185,8 @@ pub fn decode_instruction(op_u32: u32) Instruction {
         .SWL => .{ .swl = decode_generic_rs_rt_imm_i16(op_u32) },
         .SW => .{ .sw = decode_generic_rs_rt_imm_i16(op_u32) },
         .SWR => .{ .swr = decode_generic_rs_rt_imm_i16(op_u32) },
-        .LWC0 => .{ .lwc0 = undefined },
-        .LWC1 => .{ .lwc1 = undefined },
-        .LWC2 => .{ .lwc2 = undefined },
-        .LWC3 => .{ .lwc3 = undefined },
-        .SWC0 => .{ .swc0 = undefined },
-        .SWC1 => .{ .swc1 = undefined },
-        .SWC2 => .{ .swc2 = undefined },
-        .SWC3 => .{ .swc3 = undefined },
+        .LWC0, .LWC1, .LWC2, .LWC3 => .{ .lwc = decode_generic_cop_load_store(op_u32) },
+        .SWC0, .SWC1, .SWC2, .SWC3 => .{ .swc = decode_generic_cop_load_store(op_u32) },
         _ => .{ .invalid = undefined },
     };
 }
@@ -303,28 +291,81 @@ const SecondaryOpCode = enum(u6) {
 //   0100nn |0|1000|00000 | <--immediate16bit--> | BCnF target ;jump if false
 //   0100nn |0|1000|00001 | <--immediate16bit--> | BCnT target ;jump if true
 //   0100nn |1| <--------immediate25bit--------> | COPn imm25
+//
 //   010000 |1|0000| N/A  | N/A  | N/A  | 000001 | COP0 01h  ;=TLBR   ;\if any
 //   010000 |1|0000| N/A  | N/A  | N/A  | 000010 | COP0 02h  ;=TLBWI  ; (not on
 //   010000 |1|0000| N/A  | N/A  | N/A  | 000110 | COP0 06h  ;=TLBWR  ; psx)
 //   010000 |1|0000| N/A  | N/A  | N/A  | 001000 | COP0 08h  ;=TLBP   ;/
 //   010000 |1|0000| N/A  | N/A  | N/A  | 010000 | COP0 10h  ;=RFE
-//   1100nn | rs   | rt   | <--immediate16bit--> | LWCn rt_dat,[rs+imm]
-//   1110nn | rs   | rt   | <--immediate16bit--> | SWCn rt_dat,[rs+imm]
 
-const Cop0 = packed struct {
-    bits0_5: u6,
-    rd: u5,
-    rt: u5,
-    rs: cpu.RegisterName,
-    op: Cop0_Op,
-    primary: PrimaryOpCode,
+const RawCopInstruction = packed struct {
+    b0_5: u6,
+    b6_10: u5,
+    b11_15: u5,
+    b16_20: u5,
+    b21_24: u4,
+    b25: u1,
+    cop_index: u2,
+    b28_31: u4,
 };
 
-// FIXME check encoding of MFCn and friends
-const Cop0_Op = enum(u5) {
-    mfc0 = 0b00000,
-    mtc0 = 0b00100,
-    cop0_extra = 0b10000,
+fn decode_cop_instruction(op_cop: RawCopInstruction) Instruction {
+    if (op_cop.b25 == 0) {
+        // Generic ops for all coprocessors
+        const op_copn: CopN_OpCode = @enumFromInt(op_cop.b21_24);
+
+        if (op_cop.b0_5 == 0b000000) {
+            switch (op_copn) {
+                .mfc => return .{ .mfc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
+                .cfc => return .{ .cfc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
+                .mtc => return .{ .mtc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
+                .ctc => return .{ .ctc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
+                else => {},
+            }
+        }
+
+        if (op_copn == .bc) {
+            const imm_u16: u16 = @truncate(@as(u32, @bitCast(op_cop)));
+
+            switch (op_cop.b16_20) {
+                0b00000 => return .{ .bcn = .{ .cop_index = op_cop.cop_index, .condition = false, .imm_u16 = imm_u16 } },
+                0b00001 => return .{ .bcn = .{ .cop_index = op_cop.cop_index, .condition = true, .imm_u16 = imm_u16 } },
+                else => {},
+            }
+        }
+
+        return .{ .invalid = undefined };
+    } else {
+        switch (op_cop.cop_index) {
+            0 => return decode_cop0_instruction(op_cop),
+            1 => return .{ .cop1 = undefined },
+            2 => return .{ .cop2 = undefined },
+            3 => return .{ .cop3 = undefined },
+        }
+    }
+}
+
+fn decode_cop0_instruction(op_cop: RawCopInstruction) Instruction {
+    if (op_cop.b21_24 == 0b0000) {
+        return switch (op_cop.b0_5) {
+            0b000001 => .{ .invalid = undefined }, // TLBR
+            0b000010 => .{ .invalid = undefined }, // TLBWI
+            0b000110 => .{ .invalid = undefined }, // TLBWR
+            0b001000 => .{ .invalid = undefined }, // TLBP
+            0b010000 => .{ .rfe = undefined },
+            else => .{ .invalid = undefined },
+        };
+    } else {
+        return .{ .invalid = undefined };
+    }
+}
+
+const CopN_OpCode = enum(u4) {
+    mfc = 0b0000,
+    cfc = 0b0010,
+    mtc = 0b0100,
+    ctc = 0b0110,
+    bc = 0b1000,
     _,
 };
 
@@ -342,20 +383,6 @@ const Cop0RegisterName = enum(u5) {
     PRID = 15, // Processor ID (R)
     _,
 };
-
-fn decode_cop0_instruction(op_u32: u32) Instruction {
-    const op_cop0: Cop0 = @bitCast(op_u32);
-
-    switch (op_cop0.op) {
-        .mfc0 => return .{ .mfc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
-        .mtc0 => return .{ .mtc0 = .{ .cpu_rs = op_cop0.rs, .target = @enumFromInt(op_cop0.rt) } },
-        .cop0_extra => switch (op_cop0.bits0_5) {
-            0b010000 => return .{ .rfe = undefined },
-            else => unreachable,
-        },
-        _ => unreachable,
-    }
-}
 
 pub const generic_rd = struct {
     rd: cpu.RegisterName,
@@ -504,11 +531,49 @@ pub const jalr = struct {
     rd: cpu.RegisterName,
 };
 
-pub const mtc0 = struct {
-    cpu_rs: cpu.RegisterName,
-    target: Cop0RegisterName,
+pub const generic_cop_mov = struct {
+    cop_index: u2,
+    cpu_rs: cpu.RegisterName, // FIXME
+    target: Cop0RegisterName, // FIXME
 };
-pub const mfc0 = mtc0;
+
+pub const mfc = generic_cop_mov;
+pub const cfc = generic_cop_mov;
+pub const mtc = generic_cop_mov;
+pub const ctc = generic_cop_mov;
+
+pub const generic_cop_bc = struct {
+    cop_index: u2,
+    condition: bool,
+    imm_u16: u16,
+};
+
+pub const bcn = generic_cop_bc;
+
+//   31..26 |25..21|20..16|15..11|10..6 |  5..0  |
+//    6bit  | 5bit | 5bit | 5bit | 5bit |  6bit  |
+//   -------+------+------+------+------+--------+------------
+//   1100nn | rs   | rt   | <--immediate16bit--> | LWCn rt_dat,[rs+imm]
+//   1110nn | rs   | rt   | <--immediate16bit--> | SWCn rt_dat,[rs+imm]
+const RawCopLoadStoreInstruction = packed struct {
+    imm_i16: i16,
+    rt_cop: u5,
+    rs: u5,
+    cop_index: u2,
+    b28_31: u4,
+};
+
+pub const generic_cop_load_store = struct {
+    cop_index: u2,
+    rt_cop: u5,
+    rs: cpu.RegisterName,
+    imm_i16: i16,
+};
+
+fn decode_generic_cop_load_store(op_u32: u32) generic_cop_load_store {
+    const op: RawCopLoadStoreInstruction = @bitCast(op_u32);
+    return .{ .cop_index = op.cop_index, .rt_cop = op.rt_cop, .rs = @enumFromInt(op.rs), .imm_i16 = op.imm_i16 };
+}
 
 pub const mfhi = generic_rd;
 pub const mthi = generic_rd;
@@ -548,3 +613,5 @@ pub const sh = generic_rs_rt_imm_i16;
 pub const swl = generic_rs_rt_imm_i16;
 pub const sw = generic_rs_rt_imm_i16;
 pub const swr = generic_rs_rt_imm_i16;
+pub const lwc = generic_cop_load_store;
+pub const swc = generic_cop_load_store;

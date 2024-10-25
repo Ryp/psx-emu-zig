@@ -29,7 +29,7 @@ pub fn step(psx: *PSXState) void {
 
     const instruction = instructions.decode_instruction(op_code);
 
-    debug.print_instruction(op_code, instruction);
+    debug.print_instruction(instruction);
 
     psx.delay_slot = psx.branch;
     psx.branch = false;
@@ -80,8 +80,11 @@ fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) vo
         .bne => |i| execute_bne(psx, i),
         .blez => |i| execute_blez(psx, i),
         .bgtz => |i| execute_bgtz(psx, i),
-        .mfc0 => |i| execute_mfc0(psx, i),
-        .mtc0 => |i| execute_mtc0(psx, i),
+        .mfc => |i| execute_mfc(psx, i),
+        .cfc => |i| execute_cfc(psx, i),
+        .mtc => |i| execute_mtc(psx, i),
+        .ctc => |i| execute_ctc(psx, i),
+        .bcn => |i| execute_bcn(psx, i),
         .addi => |i| execute_addi(psx, i),
         .addiu => |i| execute_addiu(psx, i),
         .slti => |i| execute_slti(psx, i),
@@ -104,14 +107,8 @@ fn execute_instruction(psx: *PSXState, instruction: instructions.Instruction) vo
         .sw => |i| execute_sw(psx, i),
         .swr => |i| execute_swr(psx, i),
 
-        .lwc0 => unreachable,
-        .lwc1 => unreachable,
-        .lwc2 => unreachable,
-        .lwc3 => unreachable,
-        .swc0 => unreachable,
-        .swc1 => unreachable,
-        .swc2 => unreachable,
-        .swc3 => unreachable,
+        .lwc => |i| execute_lwc(psx, i),
+        .swc => |i| execute_swc(psx, i),
 
         .invalid => execute_reserved_instruction(psx),
     }
@@ -409,7 +406,9 @@ fn execute_bgtz(psx: *PSXState, instruction: instructions.bgtz) void {
     }
 }
 
-fn execute_mfc0(psx: *PSXState, instruction: instructions.mtc0) void {
+fn execute_mfc(psx: *PSXState, instruction: instructions.mtc) void {
+    std.debug.assert(instruction.cop_index == 0);
+
     const value: u32 = switch (instruction.target) {
         .BPC, .BDA, .JUMPDEST, .DCIC, .BadVaddr, .BDAM, .BPCM, .PRID => unreachable,
         .SR => @bitCast(psx.registers.sr),
@@ -421,7 +420,15 @@ fn execute_mfc0(psx: *PSXState, instruction: instructions.mtc0) void {
     psx.registers.pending_load = .{ .register = instruction.cpu_rs, .value = @bitCast(value) };
 }
 
-fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
+fn execute_cfc(psx: *PSXState, instruction: instructions.cfc) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_mtc(psx: *PSXState, instruction: instructions.mtc) void {
+    std.debug.assert(instruction.cop_index == 0);
+
     const value = load_reg(psx.registers, instruction.cpu_rs);
 
     switch (instruction.target) {
@@ -438,6 +445,18 @@ fn execute_mtc0(psx: *PSXState, instruction: instructions.mtc0) void {
         .EPC => unreachable,
         _ => unreachable,
     }
+}
+
+fn execute_ctc(psx: *PSXState, instruction: instructions.ctc) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
+}
+
+fn execute_bcn(psx: *PSXState, instruction: instructions.bcn) void {
+    _ = psx;
+    _ = instruction;
+    unreachable;
 }
 
 fn execute_addi(psx: *PSXState, instruction: instructions.addi) void {
@@ -651,6 +670,22 @@ fn execute_cop2(psx: *PSXState) void {
 fn execute_cop3(psx: *PSXState) void {
     _ = psx;
     unreachable;
+}
+
+fn execute_lwc(psx: *PSXState, instruction: instructions.lwc) void {
+    if (instruction.cop_index == 2) {
+        unreachable;
+    } else {
+        execute_exception(psx, .CpU);
+    }
+}
+
+fn execute_swc(psx: *PSXState, instruction: instructions.swc) void {
+    if (instruction.cop_index == 2) {
+        unreachable;
+    } else {
+        execute_exception(psx, .CpU);
+    }
 }
 
 fn execute_generic_add_with_overflow(lhs: u32, rhs: i32) struct { u32, bool } {
