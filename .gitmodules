@@ -4,3 +4,6 @@
 [submodule "external/vulkan-zig"]
 	path = external/vulkan-zig
 	url = https://github.com/Snektron/vulkan-zig
+[submodule "external/Vulkan-Headers"]
+	path = external/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers
