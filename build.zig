@@ -11,13 +11,37 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    const enable_vulkan_backend = b.option(bool, "vulkan", "Enable Vulkan renderer support") orelse true;
     const enable_tracy = b.option(bool, "tracy", "Enable Tracy support") orelse false;
     const tracy_callstack = b.option(bool, "tracy-callstack", "Include callstack information with Tracy data. Does nothing if -Dtracy is not provided") orelse false;
 
     const exe_options = b.addOptions();
+    exe_options.addOption(bool, "enable_vulkan_backend", enable_vulkan_backend);
     exe_options.addOption(bool, "enable_tracy", enable_tracy);
     exe_options.addOption(bool, "enable_tracy_callstack", tracy_callstack);
     exe.root_module.addOptions("build_options", exe_options);
+
+    if (enable_vulkan_backend) {
+        const registry_lazy = b.lazyDependency("vulkan_headers", .{});
+        const vulkan_zig_lazy = b.lazyDependency("vulkan_zig", .{});
+
+        if (registry_lazy) |registry| {
+            if (vulkan_zig_lazy) |vulkan_zig| {
+                const registry_path = registry.path("registry/vk.xml");
+
+                const vulkan_zig_generator = vulkan_zig.artifact("vulkan-zig-generator");
+                exe.linkSystemLibrary("glfw");
+
+                const vk_generate_cmd = b.addRunArtifact(vulkan_zig_generator);
+
+                vk_generate_cmd.addFileArg(registry_path);
+
+                exe.root_module.addAnonymousImport("vulkan", .{
+                    .root_source_file = vk_generate_cmd.addOutputFileArg("vk.zig"),
+                });
+            }
+        }
+    }
 
     if (enable_tracy) {
         const tracy_path = "external/tracy";
