@@ -208,9 +208,13 @@ fn execute_break(psx: *PSXState) void {
 }
 
 fn execute_mult(psx: *PSXState, instruction: instructions.mult) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const a: i64 = @as(i32, @bitCast(load_reg(psx.registers, instruction.rs)));
+    const b: i64 = @as(i32, @bitCast(load_reg(psx.registers, instruction.rt)));
+
+    const result: u64 = @bitCast(a * b);
+
+    psx.registers.hi = @truncate(result >> 32);
+    psx.registers.lo = @truncate(result);
 }
 
 fn execute_multu(psx: *PSXState, instruction: instructions.multu) void {
