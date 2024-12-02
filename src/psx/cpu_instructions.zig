@@ -46,6 +46,10 @@ const OpCodeHelper = packed struct {
     primary: PrimaryOpCode,
 };
 
+comptime {
+    std.debug.assert(@sizeOf(OpCodeHelper) == 4);
+}
+
 // NOTE: names with '_' in the name clash with zig builtins
 pub const Instruction = union(enum) {
     sll: sll,
@@ -135,9 +139,9 @@ pub fn decode_instruction(op_u32: u32) Instruction {
             .BREAK => .{ .break_ = undefined },
 
             .MFHI => .{ .mfhi = decode_generic_rd(op_u32) },
-            .MTHI => .{ .mthi = decode_generic_rd(op_u32) },
+            .MTHI => .{ .mthi = decode_generic_rs(op_u32) },
             .MFLO => .{ .mflo = decode_generic_rd(op_u32) },
-            .MTLO => .{ .mtlo = decode_generic_rd(op_u32) },
+            .MTLO => .{ .mtlo = decode_generic_rs(op_u32) },
 
             .MULT => .{ .mult = decode_generic_rs_rt(op_u32) },
             .MULTU => .{ .multu = decode_generic_rs_rt(op_u32) },
@@ -320,7 +324,7 @@ fn decode_cop_instruction(op_cop: RawCopInstruction) Instruction {
                 .cfc => return .{ .cfc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
                 .mtc => return .{ .mtc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
                 .ctc => return .{ .ctc = .{ .cop_index = op_cop.cop_index, .cpu_rs = @enumFromInt(op_cop.b16_20), .target = @enumFromInt(op_cop.b11_15) } },
-                else => {},
+                else => return .{ .invalid = undefined },
             }
         }
 
@@ -330,7 +334,7 @@ fn decode_cop_instruction(op_cop: RawCopInstruction) Instruction {
             switch (op_cop.b16_20) {
                 0b00000 => return .{ .bcn = .{ .cop_index = op_cop.cop_index, .condition = false, .imm_u16 = imm_u16 } },
                 0b00001 => return .{ .bcn = .{ .cop_index = op_cop.cop_index, .condition = true, .imm_u16 = imm_u16 } },
-                else => {},
+                else => return .{ .invalid = undefined },
             }
         }
 
@@ -391,6 +395,15 @@ pub const generic_rd = struct {
 fn decode_generic_rd(op_u32: u32) generic_rd {
     const op: OpCodeHelper = @bitCast(op_u32);
     return .{ .rd = op.b0_15.encoding_a.rd };
+}
+
+pub const generic_rs = struct {
+    rs: cpu.RegisterName,
+};
+
+fn decode_generic_rs(op_u32: u32) generic_rs {
+    const op: OpCodeHelper = @bitCast(op_u32);
+    return .{ .rs = op.rs };
 }
 
 pub const generic_rs_rt = struct {
@@ -576,9 +589,9 @@ fn decode_generic_cop_load_store(op_u32: u32) generic_cop_load_store {
 }
 
 pub const mfhi = generic_rd;
-pub const mthi = generic_rd;
+pub const mthi = generic_rs;
 pub const mflo = generic_rd;
-pub const mtlo = generic_rd;
+pub const mtlo = generic_rs;
 pub const mult = generic_rs_rt;
 pub const multu = generic_rs_rt;
 pub const div = generic_rs_rt;

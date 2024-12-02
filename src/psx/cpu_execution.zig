@@ -642,7 +642,7 @@ fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {
 }
 
 fn execute_mthi(psx: *PSXState, instruction: instructions.mthi) void {
-    psx.registers.hi = load_reg(psx.registers, instruction.rd);
+    psx.registers.hi = load_reg(psx.registers, instruction.rs);
 }
 
 fn execute_mflo(psx: *PSXState, instruction: instructions.mflo) void {
@@ -650,7 +650,7 @@ fn execute_mflo(psx: *PSXState, instruction: instructions.mflo) void {
 }
 
 fn execute_mtlo(psx: *PSXState, instruction: instructions.mtlo) void {
-    psx.registers.lo = load_reg(psx.registers, instruction.rd);
+    psx.registers.lo = load_reg(psx.registers, instruction.rs);
 }
 
 fn execute_rfe(psx: *PSXState) void {
