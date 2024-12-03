@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const enable_debug_print = false;
+
 pub const PSXState = struct {
     registers: Registers = .{},
     branch: bool = false,

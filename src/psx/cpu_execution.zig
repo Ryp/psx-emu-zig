@@ -29,7 +29,9 @@ pub fn step(psx: *PSXState) void {
 
     const instruction = instructions.decode_instruction(op_code);
 
-    debug.print_instruction(instruction);
+    if (cpu.enable_debug_print) {
+        debug.print_instruction(instruction);
+    }
 
     psx.delay_slot = psx.branch;
     psx.branch = false;
@@ -120,13 +122,17 @@ fn load_reg(registers: Registers, register_name: cpu.RegisterName) u32 {
         else => registers.r_in[@intFromEnum(register_name)],
     };
 
-    std.debug.print("reg load 0x{x:0>8} from {}\n", .{ value, register_name });
+    if (cpu.enable_debug_print) {
+        std.debug.print("reg load 0x{x:0>8} from {}\n", .{ value, register_name });
+    }
 
     return value;
 }
 
 fn store_reg(registers: *Registers, register_name: cpu.RegisterName, value: u32) void {
-    std.debug.print("reg store 0x{x:0>8} in {}\n", .{ value, register_name });
+    if (cpu.enable_debug_print) {
+        std.debug.print("reg store 0x{x:0>8} in {}\n", .{ value, register_name });
+    }
 
     switch (register_name) {
         .zero => {},
@@ -437,12 +443,16 @@ fn execute_mtc(psx: *PSXState, instruction: instructions.mtc) void {
 
     switch (instruction.target) {
         .BPC, .BDA, .JUMPDEST, .DCIC, .BadVaddr, .BDAM, .BPCM, .PRID => {
-            std.debug.print("FIXME mtc0 target write ignored\n", .{});
+            if (cpu.enable_debug_print) {
+                std.debug.print("FIXME mtc0 target write ignored\n", .{});
+            }
         },
         .SR => psx.registers.sr = @bitCast(value),
         .CAUSE => switch (value) {
             0 => {
-                std.debug.print("FIXME mtc0 target write ignored\n", .{});
+                if (cpu.enable_debug_print) {
+                    std.debug.print("FIXME mtc0 target write ignored\n", .{});
+                }
             },
             else => unreachable,
         },

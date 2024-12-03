@@ -46,7 +46,9 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
     std.debug.assert(type_info.Int.signedness == .unsigned);
     std.debug.assert(type_bits % 8 == 0);
 
-    std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
+    if (cpu.enable_debug_print) {
+        std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
+    }
 
     // {{ and }} are escaped curly brackets
     // const type_format_string = std.fmt.comptimePrint("0x{{x:0>{}}}", .{type_bytes * 2});
@@ -67,19 +69,27 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     switch (offset) {
                         HWRegs_InterruptMask_Offset, HWRegs_InterruptStatus_Offset => {
-                            std.debug.print("FIXME Interrupt load ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME Interrupt load ignored\n", .{});
+                            }
                             return 0;
                         },
                         HWRegs_DMA_Offset...HWRegs_DMA_OffsetEnd - 1 => {
-                            std.debug.print("FIXME DMA load ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME DMA load ignored\n", .{});
+                            }
                             return 0;
                         },
                         HWRegs_SPU_Offset...HWRegs_SPU_OffsetEnd - 1 => {
-                            std.debug.print("FIXME SPU load ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME SPU load ignored\n", .{});
+                            }
                             return 0;
                         },
                         HWRegs_GPUREAD_G0_Offset, HWRegs_GPUSTAT_G1_Offset => {
-                            std.debug.print("FIXME GPU load ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME GPU load ignored\n", .{});
+                            }
                             return 0;
                         },
                         else => unreachable,
@@ -100,7 +110,9 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    std.debug.print("FIXME load ignored at cache control offset\n", .{});
+                    if (cpu.enable_debug_print) {
+                        std.debug.print("FIXME load ignored at cache control offset\n", .{});
+                    }
                     return 0;
                 },
                 else => unreachable,
@@ -117,14 +129,18 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
     std.debug.assert(type_info.Int.signedness == .unsigned);
     std.debug.assert(type_bits % 8 == 0);
 
-    std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
+    if (cpu.enable_debug_print) {
+        std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
 
-    // {{ and }} are escaped curly brackets
-    const type_format_string = std.fmt.comptimePrint("0x{{x:0>{}}}", .{type_bytes * 2});
-    std.debug.print("store value: " ++ type_format_string ++ "\n", .{value});
+        // {{ and }} are escaped curly brackets
+        const type_format_string = std.fmt.comptimePrint("0x{{x:0>{}}}", .{type_bytes * 2});
+        std.debug.print("store value: " ++ type_format_string ++ "\n", .{value});
+    }
 
     if (psx.registers.sr.isolate_cache == 1) {
-        std.debug.print("FIXME store ignored because of cache isolation\n", .{});
+        if (cpu.enable_debug_print) {
+            std.debug.print("FIXME store ignored because of cache isolation\n", .{});
+        }
         return;
     }
 
@@ -143,31 +159,49 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
                 HWRegs_Offset...HWRegs_OffsetEnd - 1 => |offset| {
                     switch (offset) {
                         HWRegs_Expansion1BaseAddress_Offset, HWRegs_Expansion2BaseAddress_Offset => {
-                            std.debug.print("FIXME store ignored to expansion register\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME store ignored to expansion register\n", .{});
+                            }
                         },
                         HWRegs_0x1f801008_Offset, HWRegs_0x1f801010_Offset, HWRegs_0x1f80100c_Offset, HWRegs_0x1f801014_Offset, HWRegs_0x1f801018_Offset, HWRegs_0x1f80101c_Offset, HWRegs_0x1f801020_Offset, HWRegs_0x1f801060_Offset => {
-                            std.debug.print("FIXME store ignored to unknown register\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME store ignored to unknown register\n", .{});
+                            }
                         },
                         HWRegs_InterruptMask_Offset, HWRegs_InterruptStatus_Offset => {
-                            std.debug.print("FIXME store ignored to IRQ register\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME store ignored to IRQ register\n", .{});
+                            }
                         },
                         HWRegs_DMA_Offset...HWRegs_DMA_OffsetEnd - 1 => {
-                            std.debug.print("FIXME DMA store ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME DMA store ignored\n", .{});
+                            }
                         },
                         HWRegs_Timers_Offset...HWRegs_Timers_OffsetEnd - 1 => {
-                            std.debug.print("FIXME Timer store ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME Timer store ignored\n", .{});
+                            }
                         },
                         HWRegs_SPU_Offset...HWRegs_SPU_OffsetEnd - 1 => {
-                            std.debug.print("FIXME SPU store ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME SPU store ignored\n", .{});
+                            }
                         },
                         HWRegs_GPUREAD_G0_Offset, HWRegs_GPUSTAT_G1_Offset => {
-                            std.debug.print("FIXME GPU store ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME GPU store ignored\n", .{});
+                            }
                         },
                         HWRegs_UnknownDebug_Offset => {
-                            std.debug.print("FIXME debug store ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME debug store ignored\n", .{});
+                            }
                         },
                         else => {
-                            std.debug.print("FIXME debug store ignored\n", .{});
+                            if (cpu.enable_debug_print) {
+                                std.debug.print("FIXME debug store ignored\n", .{});
+                            }
                         },
                     }
                 },
@@ -178,7 +212,9 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    std.debug.print("FIXME store ignored at offset\n", .{});
+                    if (cpu.enable_debug_print) {
+                        std.debug.print("FIXME store ignored at offset\n", .{});
+                    }
                 },
                 else => unreachable,
             }
