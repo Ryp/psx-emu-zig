@@ -662,8 +662,7 @@ fn execute_rfe(psx: *PSXState) void {
 }
 
 fn execute_cop1(psx: *PSXState) void {
-    _ = psx;
-    unreachable;
+    execute_exception(psx, .CpU);
 }
 
 fn execute_cop2(psx: *PSXState) void {
@@ -672,8 +671,7 @@ fn execute_cop2(psx: *PSXState) void {
 }
 
 fn execute_cop3(psx: *PSXState) void {
-    _ = psx;
-    unreachable;
+    execute_exception(psx, .CpU);
 }
 
 fn execute_lwc(psx: *PSXState, instruction: instructions.lwc) void {
