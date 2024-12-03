@@ -593,15 +593,49 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
 }
 
 fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+    const address_aligned = address & ~@as(u32, 0b11);
+
+    const load_value = io.load_mem_u32(psx, address_aligned);
+
+    const previous_value = if (psx.registers.pending_load) |pending_load|
+        if (pending_load.is_unaligned) pending_load.value else 0
+    else
+        0;
+
+    const result = switch (address % 4) {
+        0 => previous_value & 0x00_ff_ff_ff | load_value << 24,
+        1 => previous_value & 0x00_00_ff_ff | load_value << 16,
+        2 => previous_value & 0x00_00_00_ff | load_value << 8,
+        3 => previous_value & 0x00_00_00_00 | load_value << 0,
+        else => unreachable,
+    };
+
+    psx.registers.pending_load = .{ .register = instruction.rt, .value = result };
 }
 
 fn execute_lwr(psx: *PSXState, instruction: instructions.lwr) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+    const address_aligned = address & ~@as(u32, 0b11);
+
+    const load_value = io.load_mem_u32(psx, address_aligned);
+
+    const previous_value = if (psx.registers.pending_load) |pending_load|
+        if (pending_load.is_unaligned) pending_load.value else 0
+    else
+        0;
+
+    const result = switch (address % 4) {
+        0 => previous_value & 0x00_00_00_00 | load_value >> 0,
+        1 => previous_value & 0xff_00_00_00 | load_value >> 8,
+        2 => previous_value & 0xff_ff_00_00 | load_value >> 16,
+        3 => previous_value & 0xff_ff_ff_00 | load_value >> 24,
+        else => unreachable,
+    };
+
+    psx.registers.pending_load = .{ .register = instruction.rt, .value = result };
 }
 
 fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
@@ -640,15 +674,43 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
 }
 
 fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value = load_reg(psx.registers, instruction.rt);
+
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+    const address_aligned = address & ~@as(u32, 0b11);
+
+    const previous_value = io.load_mem_u32(psx, address_aligned);
+
+    const result = switch (address % 4) {
+        0 => previous_value & 0xff_ff_ff_00 | value >> 24,
+        1 => previous_value & 0xff_ff_00_00 | value >> 16,
+        2 => previous_value & 0xff_00_00_00 | value >> 8,
+        3 => previous_value & 0x00_00_00_00 | value >> 0,
+        else => unreachable,
+    };
+
+    io.store_mem_u32(psx, address_aligned, result);
 }
 
 fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
-    _ = psx;
-    _ = instruction;
-    unreachable;
+    const value = load_reg(psx.registers, instruction.rt);
+
+    const address_base = load_reg(psx.registers, instruction.rs);
+    const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
+    const address_aligned = address & ~@as(u32, 0b11);
+
+    const previous_value = io.load_mem_u32(psx, address_aligned);
+
+    const result = switch (address % 4) {
+        0 => previous_value & 0x00_00_00_00 | value << 0,
+        1 => previous_value & 0x00_00_00_ff | value << 8,
+        2 => previous_value & 0x00_00_ff_ff | value << 16,
+        3 => previous_value & 0x00_ff_ff_ff | value << 24,
+        else => unreachable,
+    };
+
+    io.store_mem_u32(psx, address_aligned, result);
 }
 
 fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {

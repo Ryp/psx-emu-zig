@@ -43,7 +43,7 @@ pub const Registers = struct {
     lo: u32 = undefined, // FIXME does it have an initial value?
     sr: SystemRegister = undefined, // FIXME does it have an initial value?
     cause: CauseRegister = undefined, // FIXME does it have an initial value?
-    pending_load: ?struct { register: RegisterName, value: u32 } = null,
+    pending_load: ?struct { register: RegisterName, value: u32, is_unaligned: bool = false } = null,
 };
 
 // Register Name Conventional use
