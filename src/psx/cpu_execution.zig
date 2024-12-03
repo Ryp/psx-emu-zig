@@ -292,10 +292,13 @@ fn execute_sub(psx: *PSXState, instruction: instructions.sub) void {
     const value_s = load_reg(psx.registers, instruction.rs);
     const value_t = load_reg(psx.registers, instruction.rt);
 
-    _ = value_s;
-    _ = value_t;
-    unreachable;
-    // store_reg(&psx.registers, instruction.rd, value_s | value_t);
+    const result, const overflow = execute_generic_sub_with_overflow(value_s, @bitCast(value_t));
+
+    if (overflow) {
+        execute_exception(psx, .Ov);
+    } else {
+        store_reg(&psx.registers, instruction.rd, result);
+    }
 }
 
 fn execute_subu(psx: *PSXState, instruction: instructions.subu) void {
@@ -771,6 +774,20 @@ fn execute_generic_add_with_overflow(lhs: u32, rhs: i32) struct { u32, bool } {
         result, overflow = @addWithOverflow(lhs, @as(u32, @intCast(rhs)));
     } else {
         result, overflow = @subWithOverflow(lhs, @as(u32, @intCast(-rhs)));
+    }
+
+    return .{ result, overflow != 0 };
+}
+
+fn execute_generic_sub_with_overflow(lhs: u32, rhs: i32) struct { u32, bool } {
+    var result: u32 = undefined;
+    var overflow: u1 = undefined;
+
+    if (rhs >= 0) {
+        // NOTE: using two's-complement to ignore signedness
+        result, overflow = @subWithOverflow(lhs, @as(u32, @intCast(rhs)));
+    } else {
+        result, overflow = @addWithOverflow(lhs, @as(u32, @intCast(-rhs)));
     }
 
     return .{ result, overflow != 0 };
