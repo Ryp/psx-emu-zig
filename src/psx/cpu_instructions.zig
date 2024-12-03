@@ -343,7 +343,7 @@ fn decode_cop_instruction(op_cop: RawCopInstruction) Instruction {
         switch (op_cop.cop_index) {
             0 => return decode_cop0_instruction(op_cop),
             1 => return .{ .cop1 = undefined },
-            2 => return .{ .cop2 = undefined },
+            2 => return decode_cop2_instruction(op_cop),
             3 => return .{ .cop3 = undefined },
         }
     }
@@ -362,6 +362,11 @@ fn decode_cop0_instruction(op_cop: RawCopInstruction) Instruction {
     } else {
         return .{ .invalid = undefined };
     }
+}
+
+fn decode_cop2_instruction(op_cop: RawCopInstruction) Instruction {
+    _ = op_cop; // FIXME
+    return .{ .cop2 = undefined };
 }
 
 const CopN_OpCode = enum(u4) {
