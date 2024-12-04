@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const io = @import("cpu_io.zig");
+
 pub const enable_debug_print = false;
 
 pub const PSXState = struct {
@@ -8,6 +10,7 @@ pub const PSXState = struct {
     delay_slot: bool = false,
     bios: [BIOS_SizeBytes]u8,
     ram: []u8,
+    mmio: io.MMIO,
 };
 
 pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) !PSXState {
@@ -17,6 +20,7 @@ pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) 
     return PSXState{
         .bios = bios,
         .ram = ram,
+        .mmio = .{},
     };
 }
 
