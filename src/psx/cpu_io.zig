@@ -3,31 +3,33 @@ const std = @import("std");
 const cpu = @import("cpu.zig");
 const PSXState = cpu.PSXState;
 
+const dma = @import("dma.zig");
+
 pub fn load_mem_u8(psx: *PSXState, address: u32) u8 {
-    return load_mem_generic(u8, psx, address);
+    return load_mem_generic(u8, psx, @bitCast(address));
 }
 
 pub fn load_mem_u16(psx: *PSXState, address: u32) u16 {
-    return load_mem_generic(u16, psx, address);
+    return load_mem_generic(u16, psx, @bitCast(address));
 }
 
 pub fn load_mem_u32(psx: *PSXState, address: u32) u32 {
-    return load_mem_generic(u32, psx, address);
+    return load_mem_generic(u32, psx, @bitCast(address));
 }
 
 pub fn store_mem_u8(psx: *PSXState, address: u32, value: u8) void {
-    store_mem_generic(u8, psx, address, value);
+    store_mem_generic(u8, psx, @bitCast(address), value);
 }
 
 pub fn store_mem_u16(psx: *PSXState, address: u32, value: u16) void {
-    store_mem_generic(u16, psx, address, value);
+    store_mem_generic(u16, psx, @bitCast(address), value);
 }
 
 pub fn store_mem_u32(psx: *PSXState, address: u32, value: u32) void {
-    store_mem_generic(u32, psx, address, value);
+    store_mem_generic(u32, psx, @bitCast(address), value);
 }
 
-const PSXAddress = packed struct {
+pub const PSXAddress = packed struct {
     offset: u29,
     mapping: enum(u3) {
         Useg = 0b000,
@@ -38,7 +40,7 @@ const PSXAddress = packed struct {
 };
 
 // FIXME does cache isolation has any impact here?
-fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
+fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
     const type_info = @typeInfo(T);
     const type_bits = type_info.Int.bits;
     const type_bytes = type_bits / 8;
@@ -47,10 +49,8 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
     std.debug.assert(type_bits % 8 == 0);
 
     if (cpu.enable_debug_print) {
-        std.debug.print("load addr: 0x{x:0>8}\n", .{address_u32});
+        std.debug.print("load addr: 0x{x:0>8}\n", .{@as(u32, @bitCast(address))});
     }
-
-    const address: PSXAddress = @bitCast(address_u32);
 
     std.debug.assert(address.offset % type_bytes == 0);
 
@@ -70,8 +70,6 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
                     switch (offset) {
                         MMIO_InterruptMask_Offset,
                         MMIO_InterruptStatus_Offset,
-                        MMIO_DMA_Offset...MMIO_DMA_Control_Offset - 1,
-                        MMIO_DMA_Control_Offset + 1...MMIO_DMA_OffsetEnd - 1,
                         MMIO_GPUREAD_G0_Offset,
                         MMIO_GPUSTAT_G1_Offset,
                         MMIO_SPU_Offset...MMIO_SPU_OffsetEnd - 1,
@@ -81,8 +79,8 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
                             }
                             return 0;
                         },
-                        MMIO_DMA_Control_Offset => {
-                            return std.mem.readInt(T, type_slice[0..type_bytes], .little);
+                        dma.MMIO_Offset...dma.MMIO_OffsetEnd - 1 => {
+                            return dma.load_mmio_generic(T, psx, offset);
                         },
                         else => {
                             const value = std.mem.readInt(T, type_slice[0..type_bytes], .little);
@@ -117,7 +115,7 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32) T {
     }
 }
 
-fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: T) void {
+fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, value: T) void {
     const type_info = @typeInfo(T);
     const type_bits = type_info.Int.bits;
     const type_bytes = type_bits / 8;
@@ -126,7 +124,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
     std.debug.assert(type_bits % 8 == 0);
 
     if (cpu.enable_debug_print) {
-        std.debug.print("store addr: 0x{x:0>8}\n", .{address_u32});
+        std.debug.print("store addr: 0x{x:0>8}\n", .{@as(u32, @bitCast(address))});
 
         // {{ and }} are escaped curly brackets
         const type_format_string = std.fmt.comptimePrint("0x{{x:0>{}}}", .{type_bytes * 2});
@@ -140,8 +138,6 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
         return;
     }
 
-    const address: PSXAddress = @bitCast(address_u32);
-
     std.debug.assert(address.offset % type_bytes == 0);
 
     switch (address.mapping) {
@@ -153,10 +149,6 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
                     std.mem.writeInt(T, type_slice[0..type_bytes], value, .little);
                 },
                 MMIO_Offset...MMIO_OffsetEnd - 1 => |offset| {
-                    const local_offset = offset - MMIO_Offset;
-                    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-                    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
-
                     switch (offset) {
                         MMIO_Expansion1BaseAddress_Offset,
                         MMIO_Expansion2BaseAddress_Offset,
@@ -170,8 +162,6 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
                         MMIO_0x1f801060_Offset,
                         MMIO_InterruptMask_Offset,
                         MMIO_InterruptStatus_Offset,
-                        MMIO_DMA_Offset...MMIO_DMA_Control_Offset - 1,
-                        MMIO_DMA_Control_Offset + 1...MMIO_DMA_OffsetEnd - 1,
                         MMIO_Timers_Offset...MMIO_Timers_OffsetEnd - 1,
                         MMIO_GPUREAD_G0_Offset,
                         MMIO_SPU_Offset...MMIO_SPU_OffsetEnd - 1,
@@ -182,12 +172,11 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address_u32: u32, value: 
                             }
                         },
                         MMIO_GPUSTAT_G1_Offset => unreachable,
-                        MMIO_DMA_Control_Offset => {
-                            std.mem.writeInt(T, type_slice, value, .little);
+                        dma.MMIO_Offset...dma.MMIO_OffsetEnd - 1 => {
+                            dma.store_mmio_generic(T, psx, offset, value);
                         },
                         else => {
                             std.debug.print("address = {x}\n", .{offset});
-                            std.mem.writeInt(T, type_slice, value, .little);
                             unreachable;
                         },
                     }
@@ -235,14 +224,14 @@ const CacheControl_Offset = 0x1ffe0130;
 
 // 0x1f801000 0x9f801000 0xbf801000 8K Hardware registers
 const MMIO_SizeBytes = 8 * 1024;
-const MMIO_Offset = 0x1f801000;
+pub const MMIO_Offset = 0x1f801000;
 const MMIO_OffsetEnd = MMIO_Offset + MMIO_SizeBytes;
 pub const MMIO = packed struct {
     memory_control1: MMIO_MemoryControl1 = .{},
     io_ports: MMIO_IOPorts = .{},
     memory_control2: MMIO_MemoryControl2 = .{},
     interrupt_control: MMIO_IRQControl = .{},
-    dma: MMIO_DMA = .{},
+    dma: dma.MMIO_DMA = .{},
     timers: MMIO_Timers = .{},
     cdrom: MMIO_CDROM = .{},
     gpu: MMIO_GPU = .{},
@@ -271,58 +260,14 @@ const MMIO_MemoryControl2 = packed struct {
 };
 
 const MMIO_IRQControl_Offset = 0x1f801070;
-const MMIO_IRQControl_SizeBytes = MMIO_DMA_Offset - MMIO_IRQControl_Offset;
+const MMIO_IRQControl_SizeBytes = dma.MMIO_Offset - MMIO_IRQControl_Offset;
 const MMIO_IRQControl = packed struct {
     control: u32 = undefined,
     mask: u32 = undefined,
     _unused: u64 = undefined,
 };
 
-const MMIO_DMA_Offset = 0x1f801080;
-const MMIO_DMA_SizeBytes = MMIO_Timers_Offset - MMIO_DMA_Offset;
-const MMIO_DMA_OffsetEnd = MMIO_DMA_Offset + MMIO_DMA_SizeBytes;
-const MMIO_DMA = packed struct {
-    channel0: Channel = .{}, // MDECin  (RAM to MDEC)
-    channel1: Channel = .{}, // MDECout (MDEC to RAM)
-    channel2: Channel = .{}, // GPU (lists + image data)
-    channel3: Channel = .{}, // SPU
-    channel4: Channel = .{}, // CDROM (CDROM to RAM)
-    channel5: Channel = .{}, // PIO (Expansion Port)
-    channel6: Channel = .{}, // OTC (reverse clear OT) (GPU related)
-    control: packed union { // DPCR - DMA Control register
-        raw: u32,
-        bits: packed struct {
-            channel0_priority: u3, // 0-2   DMA0, MDECin  Priority      (0..7; 0=Highest, 7=Lowest)
-            channel0_enable: u1, // 3     DMA0, MDECin  Master Enable (0=Disable, 1=Enable)
-            channel1_priority: u3, // 4-6   DMA1, MDECout Priority      (0..7; 0=Highest, 7=Lowest)
-            channel1_enable: u1, // 7     DMA1, MDECout Master Enable (0=Disable, 1=Enable)
-            channel2_priority: u3, // 8-10  DMA2, GPU     Priority      (0..7; 0=Highest, 7=Lowest)
-            channel2_enable: u1, // 11    DMA2, GPU     Master Enable (0=Disable, 1=Enable)
-            channel3_priority: u3, // 12-14 DMA3, CDROM   Priority      (0..7; 0=Highest, 7=Lowest)
-            channel3_enable: u1, // 15    DMA3, CDROM   Master Enable (0=Disable, 1=Enable)
-            channel4_priority: u3, // 16-18 DMA4, SPU     Priority      (0..7; 0=Highest, 7=Lowest)
-            channel4_enable: u1, // 19    DMA4, SPU     Master Enable (0=Disable, 1=Enable)
-            channel5_priority: u3, // 20-22 DMA5, PIO     Priority      (0..7; 0=Highest, 7=Lowest)
-            channel5_enable: u1, // 23    DMA5, PIO     Master Enable (0=Disable, 1=Enable)
-            channel6_priority: u3, // 24-26 DMA6, OTC     Priority      (0..7; 0=Highest, 7=Lowest)
-            channel6_enable: u1, // 27    DMA6, OTC     Master Enable (0=Disable, 1=Enable)
-            _unknown1: u3, // 28-30 Unknown, Priority Offset or so? (R/W)
-            _unknown2: u1, // 31    Unknown, no effect? (R/W)
-        },
-    } = .{ .raw = 0x07654321 },
-
-    interrupt: u32 = undefined, // DICR - DMA Interrupt register FIXME
-    _unused: u64 = undefined,
-
-    const Channel = packed struct {
-        base_address: u32 = undefined, // FIXME value
-        block_control: u32 = undefined, // FIXME value
-        channel_control: u32 = undefined, // FIXME value
-        _unused: u32 = undefined,
-    };
-};
-
-const MMIO_Timers_Offset = 0x1f801100;
+pub const MMIO_Timers_Offset = 0x1f801100;
 const MMIO_Timers_SizeBytes = MMIO_CDROM_Offset - MMIO_Timers_Offset;
 const MMIO_Timers_OffsetEnd = MMIO_Timers_Offset + MMIO_Timers_SizeBytes;
 const MMIO_Timers = packed struct {
@@ -433,8 +378,6 @@ const MMIO_0x1f801060_Offset = 0x1f801060;
 const MMIO_InterruptStatus_Offset = 0x1f801070;
 const MMIO_InterruptMask_Offset = 0x1f801074;
 
-const MMIO_DMA_Control_Offset = 0x1f8010f0;
-
 const MMIO_GPUREAD_G0_Offset = 0x1f801810;
 const MMIO_GPUSTAT_G1_Offset = 0x1f801814;
 
@@ -449,7 +392,7 @@ comptime {
     std.debug.assert(@offsetOf(MMIO, "io_ports") == MMIO_IOPorts_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "memory_control2") == MMIO_MemoryControl2_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "interrupt_control") == MMIO_IRQControl_Offset - MMIO_Offset);
-    std.debug.assert(@offsetOf(MMIO, "dma") == MMIO_DMA_Offset - MMIO_Offset);
+    std.debug.assert(@offsetOf(MMIO, "dma") == dma.MMIO_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "timers") == MMIO_Timers_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "cdrom") == MMIO_CDROM_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "gpu") == MMIO_GPU_Offset - MMIO_Offset);
@@ -461,7 +404,7 @@ comptime {
     std.debug.assert(@sizeOf(MMIO_IOPorts) == MMIO_IOPorts_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_MemoryControl2) == MMIO_MemoryControl2_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_IRQControl) == MMIO_IRQControl_SizeBytes);
-    std.debug.assert(@sizeOf(MMIO_DMA) == MMIO_DMA_SizeBytes);
+    std.debug.assert(@sizeOf(dma.MMIO_DMA) == dma.MMIO_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_Timers) == MMIO_Timers_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_CDROM) == MMIO_CDROM_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_GPU) == MMIO_GPU_SizeBytes);
