@@ -14,6 +14,16 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     switch (offset) {
         MMIO_Offset...MMIO_OffsetEnd - 1 => {
             switch (offset) {
+                // Some bits should always be zero, so we assert it at write time only instead of here.
+                MMIO_DMA_Channel0_MADR_Offset, MMIO_DMA_Channel1_MADR_Offset, MMIO_DMA_Channel2_MADR_Offset, MMIO_DMA_Channel3_MADR_Offset, MMIO_DMA_Channel4_MADR_Offset, MMIO_DMA_Channel5_MADR_Offset, MMIO_DMA_Channel6_MADR_Offset => {
+                    return std.mem.readInt(T, type_slice, .little);
+                },
+                MMIO_DMA_Channel0_BCR_Offset, MMIO_DMA_Channel1_BCR_Offset, MMIO_DMA_Channel2_BCR_Offset, MMIO_DMA_Channel3_BCR_Offset, MMIO_DMA_Channel4_BCR_Offset, MMIO_DMA_Channel5_BCR_Offset, MMIO_DMA_Channel6_BCR_Offset => {
+                    return std.mem.readInt(T, type_slice, .little);
+                },
+                MMIO_DMA_Channel0_Control_Offset, MMIO_DMA_Channel1_Control_Offset, MMIO_DMA_Channel2_Control_Offset, MMIO_DMA_Channel3_Control_Offset, MMIO_DMA_Channel4_Control_Offset, MMIO_DMA_Channel5_Control_Offset, MMIO_DMA_Channel6_Control_Offset => {
+                    return std.mem.readInt(T, type_slice, .little);
+                },
                 MMIO_DMA_Control_Offset, MMIO_DMA_Interrupt_Offset => {
                     return std.mem.readInt(T, type_slice, .little);
                 },
@@ -39,6 +49,28 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
     switch (offset) {
         MMIO_Offset...MMIO_OffsetEnd - 1 => {
             switch (offset) {
+                MMIO_DMA_Channel0_MADR_Offset, MMIO_DMA_Channel1_MADR_Offset, MMIO_DMA_Channel2_MADR_Offset, MMIO_DMA_Channel3_MADR_Offset, MMIO_DMA_Channel4_MADR_Offset, MMIO_DMA_Channel5_MADR_Offset, MMIO_DMA_Channel6_MADR_Offset => {
+                    std.mem.writeInt(T, type_slice, value, .little);
+
+                    inline for (.{ psx.mmio.dma.channel0, psx.mmio.dma.channel1, psx.mmio.dma.channel2, psx.mmio.dma.channel3, psx.mmio.dma.channel4, psx.mmio.dma.channel5, psx.mmio.dma.channel6 }) |channel| {
+                        std.debug.assert(channel.base_address.zero_b24_31 == 0);
+                    }
+                },
+                MMIO_DMA_Channel0_BCR_Offset, MMIO_DMA_Channel1_BCR_Offset, MMIO_DMA_Channel2_BCR_Offset, MMIO_DMA_Channel3_BCR_Offset, MMIO_DMA_Channel4_BCR_Offset, MMIO_DMA_Channel5_BCR_Offset, MMIO_DMA_Channel6_BCR_Offset => {
+                    std.mem.writeInt(T, type_slice, value, .little);
+                },
+                MMIO_DMA_Channel0_Control_Offset, MMIO_DMA_Channel1_Control_Offset, MMIO_DMA_Channel2_Control_Offset, MMIO_DMA_Channel3_Control_Offset, MMIO_DMA_Channel4_Control_Offset, MMIO_DMA_Channel5_Control_Offset, MMIO_DMA_Channel6_Control_Offset => {
+                    std.mem.writeInt(T, type_slice, value, .little);
+
+                    inline for (.{ psx.mmio.dma.channel0, psx.mmio.dma.channel1, psx.mmio.dma.channel2, psx.mmio.dma.channel3, psx.mmio.dma.channel4, psx.mmio.dma.channel5, psx.mmio.dma.channel6 }) |channel| {
+                        std.debug.assert(channel.channel_control.zero_b2_7 == 0);
+                        std.debug.assert(channel.channel_control.zero_b11_15 == 0);
+                        std.debug.assert(channel.channel_control.zero_b19 == 0);
+                        std.debug.assert(channel.channel_control.zero_b23 == 0);
+                        std.debug.assert(channel.channel_control.zero_b25_27 == 0);
+                        std.debug.assert(channel.channel_control.zero_b31 == 0);
+                    }
+                },
                 MMIO_DMA_Control_Offset => {
                     std.mem.writeInt(T, type_slice, value, .little);
                 },
@@ -92,7 +124,7 @@ pub const MMIO_DMA = packed struct {
             _unknown2: u1, // 31    Unknown, no effect? (R/W)
         },
     } = .{ .raw = 0x07654321 },
-    interrupt: packed struct { // DICR - DMA Interrupt register FIXME
+    interrupt: packed struct { // DICR - DMA Interrupt register
         b0_5_unknown_rw: u6 = 0, // 0-5   Unknown  (read/write-able)
         zero_b6_14: u9 = 0, // 6-14  Not used (always zero)
         force_irq: u1 = 0, // 15    Force IRQ (sets bit31)                        (0=None, 1=Force Bit31=1)
@@ -123,7 +155,7 @@ pub const MMIO_DMA = packed struct {
         // In SyncMode=1 and SyncMode=2, the hardware does update MADR (it will contain the start address of the currently transferred block; at transfer end, it'll hold the end-address in SyncMode=1, or the 00FFFFFFh end-code in SyncMode=2)
         // Note: Address bit0-1 are writeable, but any updated current/end addresses are word-aligned with bit0-1 forced to zero.
         base_address: packed struct {
-            offset: u24 = undefined, // FIXME  0-23  Memory Address where the DMA will start reading from/writing to
+            offset: u24 = 0, // 0-23  Memory Address where the DMA will start reading from/writing to
             zero_b24_31: u8 = 0, //   24-31 Not used (always zero)
         } = .{},
         // 1F801084h+N*10h - D#_BCR - DMA Block Control (Channel 0..6) (R/W)
@@ -131,7 +163,7 @@ pub const MMIO_DMA = packed struct {
         // BC/BS/BA can be in range 0001h..FFFFh (or 0=10000h). For BS, take care not to set the blocksize larger than the buffer of the corresponding unit can hold. (GPU and SPU both have a 16-word buffer). A larger blocksize means faster transfer.
         // SyncMode=1 decrements BA to zero, SyncMode=0 with chopping enabled decrements BC to zero (aside from that two cases, D#_BCR isn't changed during/after transfer).
         block_control: packed union {
-            raw: u32, // FIXME
+            raw: u32,
             mode0: packed struct { // For SyncMode=0 (ie. for OTC and CDROM):
                 word_count: u16, //   0-15  BC    Number of words (0001h..FFFFh) (or 0=10000h words)
                 _unused: u16, //   16-31 0     Not used (usually 0 for OTC, or 1 ("one block") for CDROM)
@@ -153,37 +185,61 @@ pub const MMIO_DMA = packed struct {
             transfer_direction: enum(u1) {
                 ToRAM = 0,
                 FromRAM = 1,
-            },
+            } = .ToRAM,
             adress_step: enum(u1) {
                 Inc4 = 0,
                 Dec4 = 1,
-            },
+            } = .Inc4,
             zero_b2_7: u6 = 0,
-            chopping_enable: u1, // 8 Chopping Enable       (0=Normal, 1=Chopping; run CPU during DMA gaps)
+            chopping_enable: u1 = 0, // 8 Chopping Enable       (0=Normal, 1=Chopping; run CPU during DMA gaps)
             sync_mode: enum(u2) { // 9-10 SyncMode, Transfer Synchronisation/Mode (0-3):
-                StartImmediately = 0, //        0 Start immediately and transfer all at once (used for CDROM, OTC)
-                SyncBlocksToDMARequests = 1, // 1 Sync blocks to DMA requests   (used for MDEC, SPU, and GPU-data)
+                Manual = 0, //        0 Start immediately and transfer all at once (used for CDROM, OTC)
+                Request = 1, // 1 Sync blocks to DMA requests   (used for MDEC, SPU, and GPU-data)
                 LinkedList = 2, //              2 Linked-List mode              (used for GPU-command-lists)
                 Reserved = 3, //                3 Reserved                      (not used)
-            },
+            } = .Manual,
             zero_b11_15: u5 = 0,
-            chopping_dma_window: u3, // 16-18   Chopping DMA Window Size (1 SHL N words)
+            chopping_dma_window: u3 = 0, // 16-18   Chopping DMA Window Size (1 SHL N words)
             zero_b19: u1 = 0,
-            chopping_cpu_window: u3, // 20-22   Chopping CPU Window Size (1 SHL N clks)
+            chopping_cpu_window: u3 = 0, // 20-22   Chopping CPU Window Size (1 SHL N clks)
             zero_b23: u1 = 0,
             status: enum(u1) { // 24 Start/Busy            (0=Stopped/Completed, 1=Start/Enable/Busy)
                 StoppedOrCompleted = 0,
                 StartOrEnableOrBusy = 1,
-            },
+            } = .StoppedOrCompleted,
             zero_b25_27: u3 = 0,
-            start_or_trigger: u1, //   28      Start/Trigger         (0=Normal, 1=Manual Start; use for SyncMode=0)
-            unknown_rw_b29: u1, //   29      Unknown (R/W) Pause?  (0=No, 1=Pause?)     (For SyncMode=0 only?)
-            unknown_rw_b30: u1, //   30      Unknown (R/W)
+            start_or_trigger: u1 = 0, //   28      Start/Trigger         (0=Normal, 1=Manual Start; use for SyncMode=0)
+            unknown_rw_b29: u1 = 0, //   29      Unknown (R/W) Pause?  (0=No, 1=Pause?)     (For SyncMode=0 only?)
+            unknown_rw_b30: u1 = 0, //   30      Unknown (R/W)
             zero_b31: u1 = 0, //   31      Not used              (always zero)
-        } = undefined, // FIXME
+        } = .{},
         _unused: u32 = undefined,
     };
 };
+
+const MMIO_DMA_Channel0_MADR_Offset = 0x1f801080;
+const MMIO_DMA_Channel1_MADR_Offset = 0x1f801090;
+const MMIO_DMA_Channel2_MADR_Offset = 0x1f8010a0;
+const MMIO_DMA_Channel3_MADR_Offset = 0x1f8010b0;
+const MMIO_DMA_Channel4_MADR_Offset = 0x1f8010c0;
+const MMIO_DMA_Channel5_MADR_Offset = 0x1f8010d0;
+const MMIO_DMA_Channel6_MADR_Offset = 0x1f8010e0;
+
+const MMIO_DMA_Channel0_BCR_Offset = 0x1f801084;
+const MMIO_DMA_Channel1_BCR_Offset = 0x1f801094;
+const MMIO_DMA_Channel2_BCR_Offset = 0x1f8010a4;
+const MMIO_DMA_Channel3_BCR_Offset = 0x1f8010b4;
+const MMIO_DMA_Channel4_BCR_Offset = 0x1f8010c4;
+const MMIO_DMA_Channel5_BCR_Offset = 0x1f8010d4;
+const MMIO_DMA_Channel6_BCR_Offset = 0x1f8010e4;
+
+const MMIO_DMA_Channel0_Control_Offset = 0x1f801088;
+const MMIO_DMA_Channel1_Control_Offset = 0x1f801098;
+const MMIO_DMA_Channel2_Control_Offset = 0x1f8010a8;
+const MMIO_DMA_Channel3_Control_Offset = 0x1f8010b8;
+const MMIO_DMA_Channel4_Control_Offset = 0x1f8010c8;
+const MMIO_DMA_Channel5_Control_Offset = 0x1f8010d8;
+const MMIO_DMA_Channel6_Control_Offset = 0x1f8010e8;
 
 const MMIO_DMA_Control_Offset = 0x1f8010f0;
 const MMIO_DMA_Interrupt_Offset = 0x1f8010f4;
