@@ -11,31 +11,24 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     const mmio_bytes = std.mem.asBytes(&psx.mmio);
     const type_slice = mmio_bytes[local_offset..][0..type_bytes];
 
+    std.debug.assert(offset < MMIO_OffsetEnd);
+    std.debug.assert(offset >= MMIO_Offset);
+
     switch (offset) {
-        MMIO_Offset...MMIO_OffsetEnd - 1 => {
-            switch (offset) {
-                // Some bits should always be zero, so we assert it at write time only instead of here.
-                MMIO_DMA_Channel0_MADR_Offset, MMIO_DMA_Channel1_MADR_Offset, MMIO_DMA_Channel2_MADR_Offset, MMIO_DMA_Channel3_MADR_Offset, MMIO_DMA_Channel4_MADR_Offset, MMIO_DMA_Channel5_MADR_Offset, MMIO_DMA_Channel6_MADR_Offset => {
-                    return std.mem.readInt(T, type_slice, .little);
-                },
-                MMIO_DMA_Channel0_BCR_Offset, MMIO_DMA_Channel1_BCR_Offset, MMIO_DMA_Channel2_BCR_Offset, MMIO_DMA_Channel3_BCR_Offset, MMIO_DMA_Channel4_BCR_Offset, MMIO_DMA_Channel5_BCR_Offset, MMIO_DMA_Channel6_BCR_Offset => {
-                    return std.mem.readInt(T, type_slice, .little);
-                },
-                MMIO_DMA_Channel0_Control_Offset, MMIO_DMA_Channel1_Control_Offset, MMIO_DMA_Channel2_Control_Offset, MMIO_DMA_Channel3_Control_Offset, MMIO_DMA_Channel4_Control_Offset, MMIO_DMA_Channel5_Control_Offset, MMIO_DMA_Channel6_Control_Offset => {
-                    return std.mem.readInt(T, type_slice, .little);
-                },
-                MMIO_DMA_Control_Offset, MMIO_DMA_Interrupt_Offset => {
-                    return std.mem.readInt(T, type_slice, .little);
-                },
-                else => {
-                    if (cpu.enable_debug_print) {
-                        std.debug.print("FIXME load ignored\n", .{});
-                    }
-                    return 0;
-                },
-            }
+        // Some bits should always be zero, so we assert it at write time only instead of here.
+        MMIO_DMA_Channel0_MADR_Offset, MMIO_DMA_Channel1_MADR_Offset, MMIO_DMA_Channel2_MADR_Offset, MMIO_DMA_Channel3_MADR_Offset, MMIO_DMA_Channel4_MADR_Offset, MMIO_DMA_Channel5_MADR_Offset, MMIO_DMA_Channel6_MADR_Offset => {
+            return std.mem.readInt(T, type_slice, .little);
         },
-        else => unreachable, // Should already be handled upstream
+        MMIO_DMA_Channel0_BCR_Offset, MMIO_DMA_Channel1_BCR_Offset, MMIO_DMA_Channel2_BCR_Offset, MMIO_DMA_Channel3_BCR_Offset, MMIO_DMA_Channel4_BCR_Offset, MMIO_DMA_Channel5_BCR_Offset, MMIO_DMA_Channel6_BCR_Offset => {
+            return std.mem.readInt(T, type_slice, .little);
+        },
+        MMIO_DMA_Channel0_Control_Offset, MMIO_DMA_Channel1_Control_Offset, MMIO_DMA_Channel2_Control_Offset, MMIO_DMA_Channel3_Control_Offset, MMIO_DMA_Channel4_Control_Offset, MMIO_DMA_Channel5_Control_Offset, MMIO_DMA_Channel6_Control_Offset => {
+            return std.mem.readInt(T, type_slice, .little);
+        },
+        MMIO_DMA_Control_Offset, MMIO_DMA_Interrupt_Offset => {
+            return std.mem.readInt(T, type_slice, .little);
+        },
+        else => unreachable,
     }
 }
 
@@ -46,49 +39,45 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
     const mmio_bytes = std.mem.asBytes(&psx.mmio);
     const type_slice = mmio_bytes[local_offset..][0..type_bytes];
 
+    std.debug.assert(offset >= MMIO_Offset);
+    std.debug.assert(offset < MMIO_OffsetEnd);
+
     switch (offset) {
-        MMIO_Offset...MMIO_OffsetEnd - 1 => {
-            switch (offset) {
-                MMIO_DMA_Channel0_MADR_Offset, MMIO_DMA_Channel1_MADR_Offset, MMIO_DMA_Channel2_MADR_Offset, MMIO_DMA_Channel3_MADR_Offset, MMIO_DMA_Channel4_MADR_Offset, MMIO_DMA_Channel5_MADR_Offset, MMIO_DMA_Channel6_MADR_Offset => {
-                    std.mem.writeInt(T, type_slice, value, .little);
+        MMIO_DMA_Channel0_MADR_Offset, MMIO_DMA_Channel1_MADR_Offset, MMIO_DMA_Channel2_MADR_Offset, MMIO_DMA_Channel3_MADR_Offset, MMIO_DMA_Channel4_MADR_Offset, MMIO_DMA_Channel5_MADR_Offset, MMIO_DMA_Channel6_MADR_Offset => {
+            std.mem.writeInt(T, type_slice, value, .little);
 
-                    inline for (.{ psx.mmio.dma.channel0, psx.mmio.dma.channel1, psx.mmio.dma.channel2, psx.mmio.dma.channel3, psx.mmio.dma.channel4, psx.mmio.dma.channel5, psx.mmio.dma.channel6 }) |channel| {
-                        std.debug.assert(channel.base_address.zero_b24_31 == 0);
-                    }
-                },
-                MMIO_DMA_Channel0_BCR_Offset, MMIO_DMA_Channel1_BCR_Offset, MMIO_DMA_Channel2_BCR_Offset, MMIO_DMA_Channel3_BCR_Offset, MMIO_DMA_Channel4_BCR_Offset, MMIO_DMA_Channel5_BCR_Offset, MMIO_DMA_Channel6_BCR_Offset => {
-                    std.mem.writeInt(T, type_slice, value, .little);
-                },
-                MMIO_DMA_Channel0_Control_Offset, MMIO_DMA_Channel1_Control_Offset, MMIO_DMA_Channel2_Control_Offset, MMIO_DMA_Channel3_Control_Offset, MMIO_DMA_Channel4_Control_Offset, MMIO_DMA_Channel5_Control_Offset, MMIO_DMA_Channel6_Control_Offset => {
-                    std.mem.writeInt(T, type_slice, value, .little);
-
-                    inline for (.{ psx.mmio.dma.channel0, psx.mmio.dma.channel1, psx.mmio.dma.channel2, psx.mmio.dma.channel3, psx.mmio.dma.channel4, psx.mmio.dma.channel5, psx.mmio.dma.channel6 }) |channel| {
-                        std.debug.assert(channel.channel_control.zero_b2_7 == 0);
-                        std.debug.assert(channel.channel_control.zero_b11_15 == 0);
-                        std.debug.assert(channel.channel_control.zero_b19 == 0);
-                        std.debug.assert(channel.channel_control.zero_b23 == 0);
-                        std.debug.assert(channel.channel_control.zero_b25_27 == 0);
-                        std.debug.assert(channel.channel_control.zero_b31 == 0);
-                    }
-                },
-                MMIO_DMA_Control_Offset => {
-                    std.mem.writeInt(T, type_slice, value, .little);
-                },
-                MMIO_DMA_Interrupt_Offset => {
-                    const reset_irq_save = psx.mmio.dma.interrupt.reset_irq.raw;
-
-                    // FIXME this might break if the type is not u32
-                    std.mem.writeInt(T, type_slice, value, .little);
-
-                    psx.mmio.dma.interrupt.zero_b6_14 = 0;
-                    psx.mmio.dma.interrupt.reset_irq.raw = reset_irq_save & ~psx.mmio.dma.interrupt.reset_irq.raw;
-                },
-                else => if (cpu.enable_debug_print) {
-                    std.debug.print("FIXME store ignored\n", .{});
-                },
+            inline for (.{ psx.mmio.dma.channel0, psx.mmio.dma.channel1, psx.mmio.dma.channel2, psx.mmio.dma.channel3, psx.mmio.dma.channel4, psx.mmio.dma.channel5, psx.mmio.dma.channel6 }) |channel| {
+                std.debug.assert(channel.base_address.zero_b24_31 == 0);
             }
         },
-        else => unreachable, // Should already be handled upstream
+        MMIO_DMA_Channel0_BCR_Offset, MMIO_DMA_Channel1_BCR_Offset, MMIO_DMA_Channel2_BCR_Offset, MMIO_DMA_Channel3_BCR_Offset, MMIO_DMA_Channel4_BCR_Offset, MMIO_DMA_Channel5_BCR_Offset, MMIO_DMA_Channel6_BCR_Offset => {
+            std.mem.writeInt(T, type_slice, value, .little);
+        },
+        MMIO_DMA_Channel0_Control_Offset, MMIO_DMA_Channel1_Control_Offset, MMIO_DMA_Channel2_Control_Offset, MMIO_DMA_Channel3_Control_Offset, MMIO_DMA_Channel4_Control_Offset, MMIO_DMA_Channel5_Control_Offset, MMIO_DMA_Channel6_Control_Offset => {
+            std.mem.writeInt(T, type_slice, value, .little);
+
+            inline for (.{ psx.mmio.dma.channel0, psx.mmio.dma.channel1, psx.mmio.dma.channel2, psx.mmio.dma.channel3, psx.mmio.dma.channel4, psx.mmio.dma.channel5, psx.mmio.dma.channel6 }) |channel| {
+                std.debug.assert(channel.channel_control.zero_b2_7 == 0);
+                std.debug.assert(channel.channel_control.zero_b11_15 == 0);
+                std.debug.assert(channel.channel_control.zero_b19 == 0);
+                std.debug.assert(channel.channel_control.zero_b23 == 0);
+                std.debug.assert(channel.channel_control.zero_b25_27 == 0);
+                std.debug.assert(channel.channel_control.zero_b31 == 0);
+            }
+        },
+        MMIO_DMA_Control_Offset => {
+            std.mem.writeInt(T, type_slice, value, .little);
+        },
+        MMIO_DMA_Interrupt_Offset => {
+            const reset_irq_save = psx.mmio.dma.interrupt.reset_irq.raw;
+
+            // FIXME this might break if the type is not u32
+            std.mem.writeInt(T, type_slice, value, .little);
+
+            psx.mmio.dma.interrupt.zero_b6_14 = 0;
+            psx.mmio.dma.interrupt.reset_irq.raw = reset_irq_save & ~psx.mmio.dma.interrupt.reset_irq.raw;
+        },
+        else => unreachable,
     }
 }
 
@@ -217,29 +206,29 @@ pub const MMIO_DMA = packed struct {
     };
 };
 
-const MMIO_DMA_Channel0_MADR_Offset = 0x1f801080;
-const MMIO_DMA_Channel1_MADR_Offset = 0x1f801090;
-const MMIO_DMA_Channel2_MADR_Offset = 0x1f8010a0;
-const MMIO_DMA_Channel3_MADR_Offset = 0x1f8010b0;
-const MMIO_DMA_Channel4_MADR_Offset = 0x1f8010c0;
-const MMIO_DMA_Channel5_MADR_Offset = 0x1f8010d0;
-const MMIO_DMA_Channel6_MADR_Offset = 0x1f8010e0;
+const MMIO_DMA_Channel0_MADR_Offset = 0x1f801080 + 0 * 0x10;
+const MMIO_DMA_Channel1_MADR_Offset = 0x1f801080 + 1 * 0x10;
+const MMIO_DMA_Channel2_MADR_Offset = 0x1f801080 + 2 * 0x10;
+const MMIO_DMA_Channel3_MADR_Offset = 0x1f801080 + 3 * 0x10;
+const MMIO_DMA_Channel4_MADR_Offset = 0x1f801080 + 4 * 0x10;
+const MMIO_DMA_Channel5_MADR_Offset = 0x1f801080 + 5 * 0x10;
+const MMIO_DMA_Channel6_MADR_Offset = 0x1f801080 + 6 * 0x10;
 
-const MMIO_DMA_Channel0_BCR_Offset = 0x1f801084;
-const MMIO_DMA_Channel1_BCR_Offset = 0x1f801094;
-const MMIO_DMA_Channel2_BCR_Offset = 0x1f8010a4;
-const MMIO_DMA_Channel3_BCR_Offset = 0x1f8010b4;
-const MMIO_DMA_Channel4_BCR_Offset = 0x1f8010c4;
-const MMIO_DMA_Channel5_BCR_Offset = 0x1f8010d4;
-const MMIO_DMA_Channel6_BCR_Offset = 0x1f8010e4;
+const MMIO_DMA_Channel0_BCR_Offset = 0x1f801084 + 0 * 0x10;
+const MMIO_DMA_Channel1_BCR_Offset = 0x1f801084 + 1 * 0x10;
+const MMIO_DMA_Channel2_BCR_Offset = 0x1f801084 + 2 * 0x10;
+const MMIO_DMA_Channel3_BCR_Offset = 0x1f801084 + 3 * 0x10;
+const MMIO_DMA_Channel4_BCR_Offset = 0x1f801084 + 4 * 0x10;
+const MMIO_DMA_Channel5_BCR_Offset = 0x1f801084 + 5 * 0x10;
+const MMIO_DMA_Channel6_BCR_Offset = 0x1f801084 + 6 * 0x10;
 
-const MMIO_DMA_Channel0_Control_Offset = 0x1f801088;
-const MMIO_DMA_Channel1_Control_Offset = 0x1f801098;
-const MMIO_DMA_Channel2_Control_Offset = 0x1f8010a8;
-const MMIO_DMA_Channel3_Control_Offset = 0x1f8010b8;
-const MMIO_DMA_Channel4_Control_Offset = 0x1f8010c8;
-const MMIO_DMA_Channel5_Control_Offset = 0x1f8010d8;
-const MMIO_DMA_Channel6_Control_Offset = 0x1f8010e8;
+const MMIO_DMA_Channel0_Control_Offset = 0x1f801088 + 0 * 0x10;
+const MMIO_DMA_Channel1_Control_Offset = 0x1f801088 + 1 * 0x10;
+const MMIO_DMA_Channel2_Control_Offset = 0x1f801088 + 2 * 0x10;
+const MMIO_DMA_Channel3_Control_Offset = 0x1f801088 + 3 * 0x10;
+const MMIO_DMA_Channel4_Control_Offset = 0x1f801088 + 4 * 0x10;
+const MMIO_DMA_Channel5_Control_Offset = 0x1f801088 + 5 * 0x10;
+const MMIO_DMA_Channel6_Control_Offset = 0x1f801088 + 6 * 0x10;
 
 const MMIO_DMA_Control_Offset = 0x1f8010f0;
 const MMIO_DMA_Interrupt_Offset = 0x1f8010f4;
