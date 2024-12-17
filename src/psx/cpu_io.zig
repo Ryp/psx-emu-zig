@@ -79,7 +79,7 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
                             }
                             return 0;
                         },
-                        dma.MMIO_Offset...dma.MMIO_OffsetEnd - 1 => {
+                        dma.MMIO.Offset...dma.MMIO.OffsetEnd - 1 => {
                             return dma.load_mmio_generic(T, psx, offset);
                         },
                         else => {
@@ -172,7 +172,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
                             }
                         },
                         MMIO_GPUSTAT_G1_Offset => unreachable,
-                        dma.MMIO_Offset...dma.MMIO_OffsetEnd - 1 => {
+                        dma.MMIO.Offset...dma.MMIO.OffsetEnd - 1 => {
                             dma.store_mmio_generic(T, psx, offset, value);
                         },
                         else => {
@@ -231,7 +231,7 @@ pub const MMIO = packed struct {
     io_ports: MMIO_IOPorts = .{},
     memory_control2: MMIO_MemoryControl2 = .{},
     interrupt_control: MMIO_IRQControl = .{},
-    dma: dma.MMIO_DMA = .{},
+    dma: dma.MMIO.Packed = .{},
     timers: MMIO_Timers = .{},
     cdrom: MMIO_CDROM = .{},
     gpu: MMIO_GPU = .{},
@@ -260,7 +260,7 @@ const MMIO_MemoryControl2 = packed struct {
 };
 
 const MMIO_IRQControl_Offset = 0x1f801070;
-const MMIO_IRQControl_SizeBytes = dma.MMIO_Offset - MMIO_IRQControl_Offset;
+const MMIO_IRQControl_SizeBytes = dma.MMIO.Offset - MMIO_IRQControl_Offset;
 const MMIO_IRQControl = packed struct {
     control: u32 = undefined,
     mask: u32 = undefined,
@@ -392,7 +392,7 @@ comptime {
     std.debug.assert(@offsetOf(MMIO, "io_ports") == MMIO_IOPorts_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "memory_control2") == MMIO_MemoryControl2_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "interrupt_control") == MMIO_IRQControl_Offset - MMIO_Offset);
-    std.debug.assert(@offsetOf(MMIO, "dma") == dma.MMIO_Offset - MMIO_Offset);
+    std.debug.assert(@offsetOf(MMIO, "dma") == dma.MMIO.Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "timers") == MMIO_Timers_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "cdrom") == MMIO_CDROM_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "gpu") == MMIO_GPU_Offset - MMIO_Offset);
@@ -404,7 +404,6 @@ comptime {
     std.debug.assert(@sizeOf(MMIO_IOPorts) == MMIO_IOPorts_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_MemoryControl2) == MMIO_MemoryControl2_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_IRQControl) == MMIO_IRQControl_SizeBytes);
-    std.debug.assert(@sizeOf(dma.MMIO_DMA) == dma.MMIO_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_Timers) == MMIO_Timers_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_CDROM) == MMIO_CDROM_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_GPU) == MMIO_GPU_SizeBytes);
