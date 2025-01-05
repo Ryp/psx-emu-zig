@@ -2,6 +2,7 @@ const std = @import("std");
 
 const cpu = @import("cpu.zig");
 const io = @import("cpu_io.zig");
+const timers = @import("mmio_timers.zig");
 
 // FIXME this might break if the type is not u32
 pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
@@ -48,7 +49,7 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
             .MADR => {
                 std.mem.writeInt(T, type_slice, value, .little);
 
-                std.debug.assert(channel.base_address.zero_b24_31 == 0);
+                channel.base_address.zero_b24_31 = 0;
             },
             .BCR => {
                 std.mem.writeInt(T, type_slice, value, .little);
@@ -70,7 +71,7 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
                 };
 
                 if (channel.channel_control.status == .StartOrEnableOrBusy and trigger) {
-                    // DO THE THING
+                    execute_dma_transfer(psx, channel, dma_offset.channel_index);
                 }
             },
             .Invalid => unreachable,
@@ -88,10 +89,71 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
 
                 psx.mmio.dma.interrupt.zero_b6_14 = 0;
                 psx.mmio.dma.interrupt.reset_irq.raw = reset_irq_save & ~psx.mmio.dma.interrupt.reset_irq.raw;
+
+                std.debug.print("DMA Interrupt Write {}\n", .{value});
             },
             else => unreachable,
         }
     }
+}
+
+fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index: DMAChannelIndex) void {
+    std.debug.print("DMA Transfer {} in mode {}\n", .{ channel_index, channel.channel_control.sync_mode });
+
+    switch (channel.channel_control.sync_mode) {
+        .Manual, .Request => {
+            var address = channel.base_address.offset;
+            var word_count_left = get_transfer_word_count(channel);
+
+            while (word_count_left > 0) : (address = switch (channel.channel_control.adress_step) {
+                .Inc4 => address +% 4,
+                .Dec4 => address -% 4,
+            }) {
+                const address_masked = address & 0x00_1f_ff_fc;
+
+                switch (channel.channel_control.transfer_direction) {
+                    .ToRAM => {
+                        switch (channel_index) {
+                            .Channel0_MDEC_IN, .Channel1_MDEC_OUT, .Channel2_GPU, .Channel3_SPU, .Channel4_CDROM, .Channel5_PIO => {
+                                unreachable;
+                            },
+                            .Channel6_OTC => {
+                                const src_word = switch (word_count_left) {
+                                    1 => 0x00_ff_ff_ff,
+                                    else => (address -% 4) & 0x00_1f_ff_ff,
+                                };
+
+                                io.store_mem_u32(psx, address_masked, src_word);
+                            },
+                            .Invalid => unreachable,
+                        }
+                    },
+                    .FromRAM => {
+                        unreachable; // FIXME
+                    },
+                }
+
+                word_count_left -= 1;
+            }
+        },
+        .LinkedList => {
+            std.debug.assert(channel.block_control.linked_list.zero_b0_31 == 0);
+            unreachable; // FIXME
+        },
+        .Reserved => unreachable,
+    }
+
+    channel.channel_control.status = .StoppedOrCompleted;
+    channel.channel_control.start_or_trigger = 0;
+    // FIXME reset more fields
+}
+
+fn get_transfer_word_count(channel: *DMAChannel) u32 {
+    return switch (channel.channel_control.sync_mode) {
+        .Manual => channel.block_control.manual.word_count,
+        .Request => channel.block_control.request.block_count * channel.block_control.request.block_size,
+        .LinkedList, .Reserved => unreachable,
+    };
 }
 
 const DMAOffsetHelper = packed struct {
@@ -141,7 +203,7 @@ pub const MMIO = struct {
 
     pub const Packed = MMIO_DMA;
 
-    const SizeBytes = io.MMIO_Timers_Offset - Offset;
+    const SizeBytes = timers.MMIO.Offset - Offset;
 
     comptime {
         std.debug.assert(@sizeOf(Packed) == SizeBytes);

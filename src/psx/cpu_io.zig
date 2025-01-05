@@ -4,6 +4,7 @@ const cpu = @import("cpu.zig");
 const PSXState = cpu.PSXState;
 
 const dma = @import("dma.zig");
+const timers = @import("mmio_timers.zig");
 
 pub fn load_mem_u8(psx: *PSXState, address: u32) u8 {
     return load_mem_generic(u8, psx, @bitCast(address));
@@ -71,13 +72,22 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
                         MMIO_InterruptMask_Offset,
                         MMIO_InterruptStatus_Offset,
                         MMIO_GPUREAD_G0_Offset,
-                        MMIO_GPUSTAT_G1_Offset,
                         MMIO_SPU_Offset...MMIO_SPU_OffsetEnd - 1,
                         => {
                             if (cpu.enable_debug_print) {
                                 std.debug.print("FIXME load ignored\n", .{});
                             }
                             return 0;
+                        },
+                        MMIO_GPUSTAT_G1_Offset => {
+                            if (T == u32) {
+                                return 0x1c_00_00_00; // FIXME FIXME FIXME
+                            } else {
+                                unreachable;
+                            }
+                        },
+                        timers.MMIO.Offset...timers.MMIO.OffsetEnd - 1 => {
+                            return timers.load_mmio_generic(T, psx, offset);
                         },
                         dma.MMIO.Offset...dma.MMIO.OffsetEnd - 1 => {
                             return dma.load_mmio_generic(T, psx, offset);
@@ -162,8 +172,8 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
                         MMIO_0x1f801060_Offset,
                         MMIO_InterruptMask_Offset,
                         MMIO_InterruptStatus_Offset,
-                        MMIO_Timers_Offset...MMIO_Timers_OffsetEnd - 1,
                         MMIO_GPUREAD_G0_Offset,
+                        MMIO_GPUSTAT_G1_Offset,
                         MMIO_SPU_Offset...MMIO_SPU_OffsetEnd - 1,
                         MMIO_UnknownDebug_Offset,
                         => {
@@ -171,7 +181,9 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
                                 std.debug.print("FIXME store ignored\n", .{});
                             }
                         },
-                        MMIO_GPUSTAT_G1_Offset => unreachable,
+                        timers.MMIO.Offset...timers.MMIO.OffsetEnd - 1 => {
+                            timers.store_mmio_generic(T, psx, offset, value);
+                        },
                         dma.MMIO.Offset...dma.MMIO.OffsetEnd - 1 => {
                             dma.store_mmio_generic(T, psx, offset, value);
                         },
@@ -232,7 +244,7 @@ pub const MMIO = packed struct {
     memory_control2: MMIO_MemoryControl2 = .{},
     interrupt_control: MMIO_IRQControl = .{},
     dma: dma.MMIO.Packed = .{},
-    timers: MMIO_Timers = .{},
+    timers: timers.MMIO.Packed = .{},
     cdrom: MMIO_CDROM = .{},
     gpu: MMIO_GPU = .{},
     mdec: MMIO_MDEC = .{},
@@ -267,14 +279,7 @@ const MMIO_IRQControl = packed struct {
     _unused: u64 = undefined,
 };
 
-pub const MMIO_Timers_Offset = 0x1f801100;
-const MMIO_Timers_SizeBytes = MMIO_CDROM_Offset - MMIO_Timers_Offset;
-const MMIO_Timers_OffsetEnd = MMIO_Timers_Offset + MMIO_Timers_SizeBytes;
-const MMIO_Timers = packed struct {
-    _unused: u14336 = undefined,
-};
-
-const MMIO_CDROM_Offset = 0x1f801800;
+pub const MMIO_CDROM_Offset = 0x1f801800;
 const MMIO_CDROM_SizeBytes = MMIO_GPU_Offset - MMIO_CDROM_Offset;
 const MMIO_CDROM = packed struct {
     _unused: u128 = undefined,
@@ -393,7 +398,7 @@ comptime {
     std.debug.assert(@offsetOf(MMIO, "memory_control2") == MMIO_MemoryControl2_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "interrupt_control") == MMIO_IRQControl_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "dma") == dma.MMIO.Offset - MMIO_Offset);
-    std.debug.assert(@offsetOf(MMIO, "timers") == MMIO_Timers_Offset - MMIO_Offset);
+    std.debug.assert(@offsetOf(MMIO, "timers") == timers.MMIO.Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "cdrom") == MMIO_CDROM_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "gpu") == MMIO_GPU_Offset - MMIO_Offset);
     std.debug.assert(@offsetOf(MMIO, "mdec") == MMIO_MDEC_Offset - MMIO_Offset);
@@ -404,7 +409,6 @@ comptime {
     std.debug.assert(@sizeOf(MMIO_IOPorts) == MMIO_IOPorts_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_MemoryControl2) == MMIO_MemoryControl2_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_IRQControl) == MMIO_IRQControl_SizeBytes);
-    std.debug.assert(@sizeOf(MMIO_Timers) == MMIO_Timers_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_CDROM) == MMIO_CDROM_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_GPU) == MMIO_GPU_SizeBytes);
     std.debug.assert(@sizeOf(MMIO_MDEC) == MMIO_MDEC_SizeBytes);
