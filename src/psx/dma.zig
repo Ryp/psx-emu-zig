@@ -137,8 +137,35 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
             }
         },
         .LinkedList => {
+            std.debug.assert(channel_index == .Channel2_GPU);
+            std.debug.assert(channel.channel_control.transfer_direction == .FromRAM);
             std.debug.assert(channel.block_control.linked_list.zero_b0_31 == 0);
-            unreachable; // FIXME
+
+            var header_address: u24 = channel.base_address.offset & 0x1f_ff_fc;
+
+            const GPUCommandHeader = packed struct {
+                next_address: u24,
+                word_count: u8,
+            };
+
+            while (true) {
+                const header: GPUCommandHeader = @bitCast(io.load_mem_u32(psx, header_address));
+
+                // FIXME Display GPU command without any processing
+                for (0..header.word_count) |word_index| {
+                    const command_word_address = (header_address + 4 * @as(u24, @intCast(word_index))) & 0x1f_ff_fc;
+                    const command_word = io.load_mem_u32(psx, command_word_address);
+
+                    std.debug.print("GPU Command u32: 0x{x:08}\n", .{command_word}); // FIXME
+                }
+
+                // Look for end-of-list marker (mednafen does this instead of checking for 0x00_ff_ff_ff)
+                if (header.next_address & 0x80_00_00 != 0) {
+                    break;
+                }
+
+                header_address = header.next_address & 0x1f_ff_fc;
+            }
         },
         .Reserved => unreachable,
     }
