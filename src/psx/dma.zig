@@ -129,7 +129,17 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
                         }
                     },
                     .FromRAM => {
-                        unreachable; // FIXME
+                        switch (channel_index) {
+                            .Channel2_GPU => {
+                                const src_word = io.load_mem_u32(psx, address_masked);
+
+                                std.debug.print("GPU Data u32: 0x{x:08}\n", .{src_word}); // FIXME
+                            },
+                            .Channel0_MDEC_IN, .Channel1_MDEC_OUT, .Channel3_SPU, .Channel4_CDROM, .Channel5_PIO, .Channel6_OTC => {
+                                unreachable; // FIXME
+                            },
+                            .Invalid => unreachable,
+                        }
                     },
                 }
 
