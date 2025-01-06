@@ -3,7 +3,6 @@ const std = @import("std");
 const cpu = @import("cpu.zig");
 const io = @import("cpu_io.zig");
 
-// FIXME this might break if the type is not u32
 pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     const type_bytes = @typeInfo(T).Int.bits / 8;
 
