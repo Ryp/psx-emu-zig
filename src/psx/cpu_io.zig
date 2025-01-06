@@ -182,7 +182,8 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
                             timers.store_mmio_generic(T, psx, offset, value);
                         },
                         gpu.MMIO.Offset...gpu.MMIO.OffsetEnd - 1 => {
-                            gpu.store_mmio_generic(T, psx, offset, value);
+                            std.debug.assert(T == u32);
+                            gpu.store_mmio_u32(psx, offset, value);
                         },
                         else => {
                             std.debug.print("address = {x}\n", .{offset});

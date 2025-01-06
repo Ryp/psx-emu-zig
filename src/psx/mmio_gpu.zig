@@ -3,6 +3,8 @@ const std = @import("std");
 const cpu = @import("cpu.zig");
 const io = @import("cpu_io.zig");
 
+const gpu = @import("gpu.zig");
+
 pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     const type_bytes = @typeInfo(T).Int.bits / 8;
 
@@ -12,9 +14,6 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
 
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
-
-    std.debug.print("load addr: 0x{x:0>8}\n", .{offset});
-    std.debug.print("0x{x:0>8}\n", .{local_offset});
 
     std.debug.assert(T == u32);
 
@@ -41,26 +40,16 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     }
 }
 
-pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, value: T) void {
-    const type_bytes = @typeInfo(T).Int.bits / 8;
-
-    const local_offset = offset - io.MMIO_Offset;
-    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
-
-    _ = type_slice; // FIXME
-
+pub fn store_mmio_u32(psx: *cpu.PSXState, offset: u29, value: u32) void {
     std.debug.assert(offset >= MMIO.Offset);
     std.debug.assert(offset < MMIO.OffsetEnd);
 
-    std.debug.print("store addr: 0x{x:0>8}\n", .{offset});
-    std.debug.print("store value: 0x{x} ({})\n", .{ value, type_bytes });
-
-    std.debug.assert(T == u32);
-
     switch (offset) {
-        MMIO.G0_Offset, MMIO.G1_Offset => {
-            std.debug.print("FIXME store ignored\n", .{});
+        MMIO.G0_Offset => {
+            gpu.execute_gp0_write(psx, @bitCast(value));
+        },
+        MMIO.G1_Offset => {
+            std.debug.print("FIXME G1 store ignored\n", .{});
         },
         else => unreachable,
     }
@@ -96,8 +85,8 @@ const MMIO_GPU = packed struct {
         texture_x_base: u4 = 0, // 0-3   Texture page X Base   (N*64)                              ;GP0(E1h).0-3
         texture_y_base: u1 = 0, // 4     Texture page Y Base   (N*256) (ie. 0 or 256)              ;GP0(E1h).4
         semi_transparency: u2 = 0, // 5-6   Semi Transparency     (0=B/2+F/2, 1=B+F, 2=B-F, 3=B+F/4)  ;GP0(E1h).5-6
-        texture_page_colors: u2 = 0, // Texture page colors   (0=4bit, 1=8bit, 2=15bit, 3=Reserved)GP0(E1h).7-8
-        dither_mode: u1 = 0, // Dither 24bit to 15bit (0=Off/strip LSBs, 1=Dither Enabled);GP0(E1h).9
+        texture_page_colors: TexturePageColors = ._4bits, // 7-8 Texture page colors   (0=4bit, 1=8bit, 2=15bit, 3=Reserved)GP0(E1h).7-8
+        dither_mode: u1 = 0, // 9 Dither 24bit to 15bit (0=Off/strip LSBs, 1=Dither Enabled);GP0(E1h).9
         draw_to_display_area: u1 = 0, //   10    Drawing to display area (0=Prohibited, 1=Allowed)         ;GP0(E1h).10
         set_mask_bit_when_drawing: u1 = 0, //   11    Set Mask-bit when drawing pixels (0=No, 1=Yes/Mask)       ;GP0(E6h).0
         draw_pixels: u1 = 0, //   12    Draw Pixels           (0=Always, 1=Not to Masked areas)   ;GP0(E6h).1
@@ -156,4 +145,11 @@ const MMIO_GPU = packed struct {
         // Bit25: This is the DMA Request bit, however, the bit is also useful for non-DMA transfers, especially in the FIFO State mode.
     } = .{},
     _unused: u64 = undefined,
+
+    pub const TexturePageColors = enum(u2) {
+        _4bits,
+        _8bits,
+        _15bits,
+        Reserved,
+    };
 };
