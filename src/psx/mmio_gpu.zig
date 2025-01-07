@@ -49,7 +49,7 @@ pub fn store_mmio_u32(psx: *cpu.PSXState, offset: u29, value: u32) void {
             gpu.execute_gp0_write(psx, @bitCast(value));
         },
         MMIO.G1_Offset => {
-            std.debug.print("FIXME G1 store ignored\n", .{});
+            gpu.execute_gp1_write(psx, @bitCast(value));
         },
         else => unreachable,
     }
@@ -64,8 +64,9 @@ pub const MMIO = struct {
     const SizeBytes = io.MMIO_MDEC_Offset - Offset;
 
     const GPUREAD_Offset = 0x1f801810;
-    const G0_Offset = GPUREAD_Offset;
     const GPUSTAT_Offset = 0x1f801814;
+
+    const G0_Offset = GPUREAD_Offset;
     const G1_Offset = GPUSTAT_Offset;
 
     comptime {
@@ -107,7 +108,7 @@ const MMIO_GPU = packed struct {
             _15bits = 0,
             _24bits = 1,
         } = ._15bits,
-        vertical_interlace: u1 = 0, //   22    Vertical Interlace          (0=Off, 1=On)                 ;GP1(08h).5
+        vertical_interlace: u1 = 1, //   22    Vertical Interlace          (0=Off, 1=On)                 ;GP1(08h).5
         display_toggle: enum(u1) { //   23    Display Enable              (0=Enabled, 1=Disabled)       ;GP1(03h).0
             Enabled = 0,
             Disabled = 1,
