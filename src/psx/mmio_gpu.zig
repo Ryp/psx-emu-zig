@@ -106,12 +106,7 @@ const MMIO_GPU = packed struct {
         ready_to_send_cmd: u1 = 1, // FIXME //   26    Ready to receive Cmd Word   (0=No, 1=Ready)  ;GP0(...) ;via GP0
         ready_to_send_vram_to_cpu: u1 = 1, // FIXME //   27    Ready to send VRAM to CPU   (0=No, 1=Ready)  ;GP0(C0h) ;via GPUREAD
         ready_to_recv_dma_block: u1 = 1, // FIXME  //   28    Ready to receive DMA Block  (0=No, 1=Ready)  ;GP0(...) ;via GP0
-        dma_direction: enum(u2) { // 29-30 DMA Direction
-            Off,
-            Fifo,
-            CPUtoGP0,
-            VRAMtoCPU,
-        } = .Off,
+        dma_direction: DMADirection = .Off, // 29-30 DMA Direction
         drawing_even_odd_line_in_interlace_mode: u1 = 0, //   31    Drawing even/odd lines in interlace mode (0=Even or Vblank, 1=Odd)
         //
         // In 480-lines mode, bit31 changes per frame. And in 240-lines mode, the bit changes per scanline.
@@ -151,5 +146,12 @@ const MMIO_GPU = packed struct {
     pub const DisplayAreaColorDepth = enum(u1) {
         _15bits = 0,
         _24bits = 1,
+    };
+
+    pub const DMADirection = enum(u2) {
+        Off,
+        Fifo,
+        CPUtoGP0,
+        VRAMtoCPU,
     };
 };
