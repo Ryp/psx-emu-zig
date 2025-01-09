@@ -3,6 +3,7 @@ const std = @import("std");
 const cpu = @import("cpu.zig");
 const io = @import("cpu_io.zig");
 const timers = @import("mmio_timers.zig");
+const gpu = @import("gpu.zig");
 
 // FIXME this might break if the type is not u32
 pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
@@ -152,12 +153,11 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
             while (true) {
                 const header: GPUCommandHeader = @bitCast(io.load_mem_u32(psx, header_address));
 
-                // FIXME Display GPU command without any processing
                 for (0..header.word_count) |word_index| {
-                    const command_word_address = (header_address + 4 * @as(u24, @intCast(word_index))) & 0x1f_ff_fc;
+                    const command_word_address = (header_address + 4 * @as(u24, @intCast(word_index + 1))) & 0x1f_ff_fc;
                     const command_word = io.load_mem_u32(psx, command_word_address);
 
-                    std.debug.print("GPU Command u32: 0x{x:08}\n", .{command_word}); // FIXME
+                    gpu.execute_gp0_write(psx, @bitCast(command_word));
                 }
 
                 // Look for end-of-list marker (mednafen does this instead of checking for 0x00_ff_ff_ff)
