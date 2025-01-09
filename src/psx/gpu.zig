@@ -66,6 +66,16 @@ pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: G1CommandRaw) void {
         .SoftReset => {
             execute_soft_reset(psx);
         },
+        .DisplayMode => |display_mode| {
+            psx.mmio.gpu.GPUSTAT.horizontal_resolution1 = display_mode.horizontal_resolution1;
+            psx.mmio.gpu.GPUSTAT.vertical_resolution = display_mode.vertical_resolution;
+            psx.mmio.gpu.GPUSTAT.video_mode = display_mode.video_mode;
+            psx.mmio.gpu.GPUSTAT.display_area_color_depth = display_mode.display_area_color_depth;
+            psx.mmio.gpu.GPUSTAT.vertical_interlace = display_mode.vertical_interlace;
+            psx.mmio.gpu.GPUSTAT.horizontal_resolution2 = display_mode.horizontal_resolution2;
+            psx.mmio.gpu.GPUSTAT.reverse_flag = display_mode.reverse_flag;
+            std.debug.assert(display_mode.reverse_flag == 0);
+        },
         else => unreachable,
     }
 }
@@ -117,6 +127,7 @@ fn make_gp0_command(raw: G0CommandRaw) G0Command {
 
 const G1OpCode = enum(u8) {
     SoftReset = 0x00,
+    DisplayMode = 0x08,
     _,
 };
 
@@ -127,11 +138,21 @@ const G1CommandRaw = packed struct {
 
 const G1Command = union(G1OpCode) {
     SoftReset,
+    DisplayMode: packed struct {
+        horizontal_resolution1: u2,
+        vertical_resolution: mmio_gpu.MMIO.Packed.VerticalResolution,
+        video_mode: mmio_gpu.MMIO.Packed.VideoMode,
+        display_area_color_depth: mmio_gpu.MMIO.Packed.DisplayAreaColorDepth,
+        vertical_interlace: u1,
+        horizontal_resolution2: u1,
+        reverse_flag: u1,
+    },
 };
 
 fn make_gp1_command(raw: G1CommandRaw) G1Command {
     return switch (raw.op_code) {
         .SoftReset => .{ .SoftReset = undefined },
+        .DisplayMode => .{ .DisplayMode = @bitCast(@as(u8, @truncate(raw.payload))) },
         else => unreachable,
     };
 }

@@ -87,20 +87,11 @@ const MMIO_GPU = packed struct {
         interlace_field: u1 = 0, //   13    Interlace Field       (or, always 1 when GP1(08h).5=0)
         reverse_flag: u1 = 0, //   14    "Reverseflag"         (0=Normal, 1=Distorted)             ;GP1(08h).7
         texture_disable: u1 = 0, //   15    Texture Disable       (0=Normal, 1=Disable Textures)      ;GP0(E1h).11
-        horizontal_resolution1: u1 = 0, //   16    Horizontal Resolution 2     (0=256/320/512/640, 1=368)    ;GP1(08h).6
-        horizontal_resolution2: u2 = 0, //   17-18 Horizontal Resolution 1     (0=256, 1=320, 2=512, 3=640)  ;GP1(08h).0-1
-        vertical_resolution: enum(u1) { //   19    Vertical Resolution         (0=240, 1=480, when Bit22=1)  ;GP1(08h).2
-            _240lines,
-            _480lines,
-        } = ._240lines,
-        video_mode: enum(u1) { //   20    Video Mode                  (0=NTSC/60Hz, 1=PAL/50Hz)     ;GP1(08h).3
-            NTSC,
-            PAL,
-        } = .NTSC,
-        display_area_color_depth: enum(u1) { //   21    Display Area Color Depth    (0=15bit, 1=24bit)            ;GP1(08h).4
-            _15bits = 0,
-            _24bits = 1,
-        } = ._15bits,
+        horizontal_resolution2: u1 = 0, //   16    Horizontal Resolution 2     (0=256/320/512/640, 1=368)    ;GP1(08h).6
+        horizontal_resolution1: u2 = 0, //   17-18 Horizontal Resolution 1     (0=256, 1=320, 2=512, 3=640)  ;GP1(08h).0-1
+        vertical_resolution: VerticalResolution = ._240lines, //   19    Vertical Resolution         (0=240, 1=480, when Bit22=1)  ;GP1(08h).2
+        video_mode: VideoMode = .NTSC, //   20    Video Mode                  (0=NTSC/60Hz, 1=PAL/50Hz)     ;GP1(08h).3
+        display_area_color_depth: DisplayAreaColorDepth = ._15bits, //   21    Display Area Color Depth    (0=15bit, 1=24bit)            ;GP1(08h).4
         vertical_interlace: u1 = 1, //   22    Vertical Interlace          (0=Off, 1=On)                 ;GP1(08h).5
         display_toggle: enum(u1) { //   23    Display Enable              (0=Enabled, 1=Disabled)       ;GP1(03h).0
             Enabled = 0,
@@ -145,5 +136,20 @@ const MMIO_GPU = packed struct {
         _8bits,
         _15bits,
         Reserved,
+    };
+
+    pub const VerticalResolution = enum(u1) {
+        _240lines,
+        _480lines,
+    };
+
+    pub const VideoMode = enum(u1) {
+        NTSC,
+        PAL,
+    };
+
+    pub const DisplayAreaColorDepth = enum(u1) {
+        _15bits = 0,
+        _24bits = 1,
     };
 };
