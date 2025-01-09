@@ -20,11 +20,11 @@ pub fn main() !void {
         return error.MissingArgument;
     }
 
-    const iso_filename = args[1];
+    const bios_filename = args[1];
 
     // FIXME What the idiomatic way of writing this?
-    var file = if (std.fs.cwd().openFile(iso_filename, .{})) |f| f else |err| {
-        std.debug.print("error: couldn't open ISO file: '{s}'\n", .{iso_filename});
+    var file = if (std.fs.cwd().openFile(bios_filename, .{})) |f| f else |err| {
+        std.debug.print("error: couldn't open BIOS file: '{s}'\n", .{bios_filename});
         return err;
     };
     defer file.close();
