@@ -31,6 +31,17 @@ pub fn store_mem_u32(psx: *PSXState, address: u32, value: u32) void {
     store_mem_generic(u32, psx, @bitCast(address), value);
 }
 
+// FIXME check if this is legal
+pub fn get_mutable_mmio_slice_generic(comptime T: type, psx: *PSXState, offset: u29) *[@typeInfo(T).int.bits / 8]u8 {
+    const type_bytes = @typeInfo(T).int.bits / 8;
+
+    const local_offset = offset - MMIO_Offset;
+    const mmio_bytes = std.mem.asBytes(&psx.mmio);
+    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
+
+    return type_slice;
+}
+
 pub const PSXAddress = packed struct {
     offset: u29,
     mapping: enum(u3) {
@@ -44,10 +55,10 @@ pub const PSXAddress = packed struct {
 // FIXME does cache isolation has any impact here?
 fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
     const type_info = @typeInfo(T);
-    const type_bits = type_info.Int.bits;
+    const type_bits = type_info.int.bits;
     const type_bytes = type_bits / 8;
 
-    std.debug.assert(type_info.Int.signedness == .unsigned);
+    std.debug.assert(type_info.int.signedness == .unsigned);
     std.debug.assert(type_bits % 8 == 0);
 
     if (cpu.enable_debug_print) {
@@ -61,14 +72,10 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
             switch (address.offset) {
                 RAM_Offset...RAM_OffsetEnd - 1 => |offset| {
                     const local_offset = offset - RAM_Offset;
-                    const type_slice = psx.ram[local_offset..];
-                    return std.mem.readInt(T, type_slice[0..type_bytes], .little);
+                    const type_slice = psx.ram[local_offset..][0..type_bytes];
+                    return std.mem.readInt(T, type_slice, .little);
                 },
                 MMIO_Offset...MMIO_OffsetEnd - 1 => |offset| {
-                    const local_offset = offset - MMIO_Offset;
-                    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-                    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
-
                     switch (offset) {
                         MMIO_InterruptMask_Offset,
                         MMIO_InterruptStatus_Offset,
@@ -86,10 +93,15 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
                             return timers.load_mmio_generic(T, psx, offset);
                         },
                         gpu.MMIO.Offset...gpu.MMIO.OffsetEnd - 1 => {
-                            return gpu.load_mmio_generic(T, psx, offset);
+                            if (T == u32) {
+                                return gpu.load_mmio_u32(psx, offset);
+                            } else {
+                                unreachable;
+                            }
                         },
                         else => {
-                            const value = std.mem.readInt(T, type_slice[0..type_bytes], .little);
+                            const type_slice = get_mutable_mmio_slice_generic(T, psx, offset);
+                            const value = std.mem.readInt(T, type_slice, .little);
                             std.debug.print("address {x} = {}\n", .{ offset, value });
                             unreachable;
                         },
@@ -123,10 +135,10 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
 
 fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, value: T) void {
     const type_info = @typeInfo(T);
-    const type_bits = type_info.Int.bits;
+    const type_bits = type_info.int.bits;
     const type_bytes = type_bits / 8;
 
-    std.debug.assert(type_info.Int.signedness == .unsigned);
+    std.debug.assert(type_info.int.signedness == .unsigned);
     std.debug.assert(type_bits % 8 == 0);
 
     if (cpu.enable_debug_print) {
@@ -182,8 +194,11 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
                             timers.store_mmio_generic(T, psx, offset, value);
                         },
                         gpu.MMIO.Offset...gpu.MMIO.OffsetEnd - 1 => {
-                            std.debug.assert(T == u32);
-                            gpu.store_mmio_u32(psx, offset, value);
+                            if (T == u32) {
+                                gpu.store_mmio_u32(psx, offset, value);
+                            } else {
+                                unreachable;
+                            }
                         },
                         else => {
                             std.debug.print("address = {x}\n", .{offset});

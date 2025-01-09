@@ -4,28 +4,20 @@ const cpu = @import("cpu.zig");
 const io = @import("cpu_io.zig");
 
 pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
-    const type_bytes = @typeInfo(T).Int.bits / 8;
-
-    const local_offset = offset - io.MMIO_Offset;
-    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
-
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
 
     const timer_offset: TimerOffsetHelper = @bitCast(offset);
 
-    std.debug.print("load addr: 0x{x:0>8} | {}\n", .{ offset, timer_offset });
-    std.debug.print("0x{x:0>8} | 0x{x:0>8}\n", .{ local_offset, @offsetOf(MMIO_Timers, "_unused") });
-
-    std.debug.assert(T != u8);
-
-    // FIXME Some bits should always be zero, so we assert it at write time only instead of here.
     if (offset - MMIO.Offset < @offsetOf(MMIO_Timers, "_unused") and timer_offset.channel_index != .Invalid) {
         // const timer = get_timer(psx, timer_offset.channel_index);
 
         switch (timer_offset.channel_register) {
             .Value, .Mode, .Target => {
+                std.debug.assert(T != u8);
+
+                const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
+
                 return std.mem.readInt(T, type_slice, .little);
             },
             .Invalid => unreachable,
@@ -36,28 +28,20 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
 }
 
 pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, value: T) void {
-    const type_bytes = @typeInfo(T).Int.bits / 8;
-
-    const local_offset = offset - io.MMIO_Offset;
-    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
-
     std.debug.assert(offset >= MMIO.Offset);
     std.debug.assert(offset < MMIO.OffsetEnd);
 
     const timer_offset: TimerOffsetHelper = @bitCast(offset);
-
-    std.debug.print("store addr: 0x{x:0>8} | {}\n", .{ offset, timer_offset });
-    std.debug.print("0x{x:0>8} | 0x{x:0>8}\n", .{ local_offset, @offsetOf(MMIO_Timers, "_unused") });
-    std.debug.print("store value: 0x{x} ({})\n", .{ value, type_bytes });
-
-    std.debug.assert(T != u8);
 
     if (offset - MMIO.Offset < @offsetOf(MMIO_Timers, "_unused") and timer_offset.channel_index != .Invalid) {
         // const timer = get_timer(psx, timer_offset.channel_index);
 
         switch (timer_offset.channel_register) {
             .Value, .Mode, .Target => {
+                std.debug.assert(T != u8);
+
+                const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
+
                 // In case of u32 writes, just keep the full value in.
                 std.mem.writeInt(T, type_slice, value, .little);
             },

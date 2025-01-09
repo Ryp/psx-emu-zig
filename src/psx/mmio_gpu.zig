@@ -5,20 +5,20 @@ const io = @import("cpu_io.zig");
 
 const gpu = @import("gpu.zig");
 
-pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
-    const type_bytes = @typeInfo(T).Int.bits / 8;
-
-    const local_offset = offset - io.MMIO_Offset;
-    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
-
+pub fn load_mmio_u32(psx: *cpu.PSXState, offset: u29) u32 {
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
 
-    std.debug.assert(T == u32);
+    const type_slice = io.get_mutable_mmio_slice_generic(u32, psx, offset);
 
     switch (offset) {
         MMIO.GPUREAD_Offset => {
+            const value = std.mem.readInt(u32, type_slice, .little);
+
+            std.debug.assert(value == 0);
+            return value; // FIXME
+        },
+        MMIO.GPUSTAT_Offset => {
             // Update read-only registers
             psx.mmio.gpu.GPUSTAT.dma_data_request_mode = switch (psx.mmio.gpu.GPUSTAT.dma_direction) {
                 .Off => 0,
@@ -27,14 +27,7 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
                 .VRAMtoCPU => psx.mmio.gpu.GPUSTAT.ready_to_send_vram_to_cpu,
             };
 
-            return std.mem.readInt(T, type_slice[0..type_bytes], .little);
-        },
-        MMIO.GPUSTAT_Offset => {
-            if (T == u32) {
-                return 0x1c_00_00_00; // FIXME FIXME FIXME
-            } else {
-                unreachable;
-            }
+            return std.mem.readInt(u32, type_slice, .little);
         },
         else => unreachable,
     }
@@ -78,8 +71,8 @@ const MMIO_GPU = packed struct {
     // 1F801810h.Read  4   GPUREAD Read responses to GP0(C0h) and GP1(10h) commands
     // 1F801810h.Write 4   GP0 Send GP0 Commands/Packets (Rendering and VRAM Access)
     GPUREAD: packed struct {
-        todo: u32 = undefined,
-    } = undefined,
+        todo: u32 = 0, // FIXME
+    } = .{},
     // 1F801814h.Read  4   GPUSTAT Read GPU Status Register
     // 1F801814h.Write 4   GP1 Send GP1 Commands (Display Control)
     GPUSTAT: packed struct { // Read-only

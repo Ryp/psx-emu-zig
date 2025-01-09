@@ -6,11 +6,7 @@ const timers = @import("mmio_timers.zig");
 
 // FIXME this might break if the type is not u32
 pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
-    const type_bytes = @typeInfo(T).Int.bits / 8;
-
-    const local_offset = offset - io.MMIO_Offset;
-    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
+    const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
 
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
@@ -31,11 +27,7 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
 }
 
 pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, value: T) void {
-    const type_bytes = @typeInfo(T).Int.bits / 8;
-
-    const local_offset = offset - io.MMIO_Offset;
-    const mmio_bytes = std.mem.asBytes(&psx.mmio);
-    const type_slice = mmio_bytes[local_offset..][0..type_bytes];
+    const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
 
     std.debug.assert(offset >= MMIO.Offset);
     std.debug.assert(offset < MMIO.OffsetEnd);
@@ -90,7 +82,7 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
                 psx.mmio.dma.interrupt.zero_b6_14 = 0;
                 psx.mmio.dma.interrupt.reset_irq.raw = reset_irq_save & ~psx.mmio.dma.interrupt.reset_irq.raw;
 
-                std.debug.print("DMA Interrupt Write {}\n", .{value});
+                // std.debug.print("DMA Interrupt Write {}\n", .{value});
             },
             else => unreachable,
         }
@@ -98,7 +90,7 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
 }
 
 fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index: DMAChannelIndex) void {
-    std.debug.print("DMA Transfer {} in mode {}\n", .{ channel_index, channel.channel_control.sync_mode });
+    // std.debug.print("DMA Transfer {} in mode {}\n", .{ channel_index, channel.channel_control.sync_mode });
 
     switch (channel.channel_control.sync_mode) {
         .Manual, .Request => {
@@ -131,9 +123,8 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
                     .FromRAM => {
                         switch (channel_index) {
                             .Channel2_GPU => {
-                                const src_word = io.load_mem_u32(psx, address_masked);
-
-                                std.debug.print("GPU Data u32: 0x{x:08}\n", .{src_word}); // FIXME
+                                // const src_word = io.load_mem_u32(psx, address_masked);
+                                // std.debug.print("GPU Data u32: 0x{x:08}\n", .{src_word}); // FIXME
                             },
                             .Channel0_MDEC_IN, .Channel1_MDEC_OUT, .Channel3_SPU, .Channel4_CDROM, .Channel5_PIO, .Channel6_OTC => {
                                 unreachable; // FIXME
