@@ -82,8 +82,10 @@ const MMIO_GPU = packed struct {
         texture_page_colors: TexturePageColors = ._4bits, // 7-8 Texture page colors   (0=4bit, 1=8bit, 2=15bit, 3=Reserved)GP0(E1h).7-8
         dither_mode: u1 = 0, // 9 Dither 24bit to 15bit (0=Off/strip LSBs, 1=Dither Enabled);GP0(E1h).9
         draw_to_display_area: u1 = 0, //   10    Drawing to display area (0=Prohibited, 1=Allowed)         ;GP0(E1h).10
-        set_mask_bit_when_drawing: u1 = 0, //   11    Set Mask-bit when drawing pixels (0=No, 1=Yes/Mask)       ;GP0(E6h).0
-        draw_pixels: u1 = 0, //   12    Draw Pixels           (0=Always, 1=Not to Masked areas)   ;GP0(E6h).1
+        // Set mask while drawing (0=TextureBit15, 1=ForceBit15=1)   ;GPUSTAT.11
+        set_mask_when_drawing: u1 = 0, //   11    Set Mask-bit when drawing pixels (0=No, 1=Yes/Mask)       ;GP0(E6h).0
+        // Check mask before draw (0=Draw Always, 1=Draw if Bit15=0) ;GPUSTAT.12
+        check_mask_before_drawing: u1 = 0, //   12    Draw Pixels           (0=Always, 1=Not to Masked areas)   ;GP0(E6h).1
         interlace_field: u1 = 0, //   13    Interlace Field       (or, always 1 when GP1(08h).5=0)
         reverse_flag: u1 = 0, //   14    "Reverseflag"         (0=Normal, 1=Distorted)             ;GP1(08h).7
         texture_disable: u1 = 0, //   15    Texture Disable       (0=Normal, 1=Disable Textures)      ;GP0(E1h).11

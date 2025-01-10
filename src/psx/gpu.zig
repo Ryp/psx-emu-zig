@@ -4,21 +4,21 @@ const cpu = @import("cpu.zig");
 const mmio_gpu = @import("mmio_gpu.zig");
 
 pub const State = struct {
-    texture_window_x_mask: u8 = 0, // FIXME Type
-    texture_window_y_mask: u8 = 0, // FIXME Type
-    texture_window_x_offset: u8 = 0, // FIXME Type
-    texture_window_y_offset: u8 = 0, // FIXME Type
+    texture_window_x_mask: u5 = 0,
+    texture_window_y_mask: u5 = 0,
+    texture_window_x_offset: u5 = 0,
+    texture_window_y_offset: u5 = 0,
 
     rectangle_texture_x_flip: u1 = 0,
     rectangle_texture_y_flip: u1 = 0,
 
-    drawing_area_left: u16 = 0, // FIXME Type
-    drawing_area_top: u16 = 0, // FIXME Type
-    drawing_area_right: u16 = 0, // FIXME Type
-    drawing_area_bottom: u16 = 0, // FIXME Type
+    drawing_area_left: u10 = 0,
+    drawing_area_top: u10 = 0,
+    drawing_area_right: u10 = 0,
+    drawing_area_bottom: u10 = 0,
 
-    drawing_x_offset: i16 = 0, // FIXME Type
-    drawing_y_offset: i16 = 0, // FIXME Type
+    drawing_x_offset: i11 = 0,
+    drawing_y_offset: i11 = 0,
 
     display_vram_x_start: u16 = 0, // FIXME Type
     display_vram_y_start: u16 = 0, // FIXME Type
@@ -40,7 +40,7 @@ pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: G0CommandRaw) void {
         .ClearTextureCache => {
             unreachable;
         },
-        .DrawMode => |draw_mode| {
+        .SetDrawMode => |draw_mode| {
             psx.mmio.gpu.GPUSTAT.texture_x_base = draw_mode.texture_x_base;
             psx.mmio.gpu.GPUSTAT.texture_y_base = draw_mode.texture_y_base;
             psx.mmio.gpu.GPUSTAT.semi_transparency = draw_mode.semi_transparency;
@@ -55,7 +55,39 @@ pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: G0CommandRaw) void {
             std.debug.assert(draw_mode.texture_page_colors != .Reserved);
             std.debug.assert(draw_mode.zero_b14_23 == 0);
         },
-        else => unreachable, // FIXME
+        .SetTextureWindow => |texture_window| {
+            psx.gpu.texture_window_x_mask = texture_window.mask_x;
+            psx.gpu.texture_window_y_mask = texture_window.mask_y;
+            psx.gpu.texture_window_x_offset = texture_window.offset_x;
+            psx.gpu.texture_window_y_offset = texture_window.offset_y;
+
+            std.debug.assert(texture_window.zero_b20_23 == 0);
+        },
+        .SetDrawingAreaTopLeft => |drawing_area| {
+            psx.gpu.drawing_area_left = drawing_area.left;
+            psx.gpu.drawing_area_top = drawing_area.top;
+
+            std.debug.assert(drawing_area.zero_b20_23 == 0);
+        },
+        .SetDrawingAreaBottomRight => |drawing_area| {
+            psx.gpu.drawing_area_right = drawing_area.right;
+            psx.gpu.drawing_area_bottom = drawing_area.bottom;
+
+            std.debug.assert(drawing_area.zero_b20_23 == 0);
+        },
+        .SetDrawingOffset => |drawing_offset| {
+            psx.gpu.drawing_x_offset = drawing_offset.x;
+            psx.gpu.drawing_y_offset = drawing_offset.y;
+
+            std.debug.assert(drawing_offset.zero_b22_23 == 0);
+        },
+        .SetMaskBitSetting => |mask_bit_setting| {
+            psx.mmio.gpu.GPUSTAT.set_mask_when_drawing = mask_bit_setting.set_mask_when_drawing;
+            psx.mmio.gpu.GPUSTAT.check_mask_before_drawing = mask_bit_setting.check_mask_before_drawing;
+
+            std.debug.assert(mask_bit_setting.zero_b2_23 == 0);
+        },
+        else => unreachable,
     }
 }
 
@@ -93,7 +125,12 @@ fn execute_soft_reset(psx: *cpu.PSXState) void {
 const G0OpCode = enum(u8) {
     Noop = 0x00,
     ClearTextureCache = 0x01,
-    DrawMode = 0xe1,
+    SetDrawMode = 0xe1,
+    SetTextureWindow = 0xe2,
+    SetDrawingAreaTopLeft = 0xe3,
+    SetDrawingAreaBottomRight = 0xe4,
+    SetDrawingOffset = 0xe5,
+    SetMaskBitSetting = 0xe6,
     _,
 };
 
@@ -105,7 +142,7 @@ const G0CommandRaw = packed struct {
 const G0Command = union(G0OpCode) {
     Noop,
     ClearTextureCache,
-    DrawMode: packed struct {
+    SetDrawMode: packed struct {
         texture_x_base: u4,
         texture_y_base: u1,
         semi_transparency: u2,
@@ -117,13 +154,45 @@ const G0Command = union(G0OpCode) {
         rectangle_texture_y_flip: u1,
         zero_b14_23: u10,
     },
+    SetTextureWindow: packed struct {
+        mask_x: u5,
+        mask_y: u5,
+        offset_x: u5,
+        offset_y: u5,
+        zero_b20_23: u4,
+    },
+    SetDrawingAreaTopLeft: packed struct {
+        left: u10,
+        top: u10,
+        zero_b20_23: u4,
+    },
+    SetDrawingAreaBottomRight: packed struct {
+        right: u10,
+        bottom: u10,
+        zero_b20_23: u4,
+    },
+    SetDrawingOffset: packed struct {
+        x: i11,
+        y: i11,
+        zero_b22_23: u2,
+    },
+    SetMaskBitSetting: packed struct {
+        set_mask_when_drawing: u1,
+        check_mask_before_drawing: u1,
+        zero_b2_23: u22,
+    },
 };
 
 fn make_gp0_command(raw: G0CommandRaw) G0Command {
     return switch (raw.op_code) {
         .Noop => .{ .Noop = undefined },
         .ClearTextureCache => .{ .ClearTextureCache = undefined },
-        .DrawMode => .{ .DrawMode = @bitCast(raw.payload) },
+        .SetDrawMode => .{ .SetDrawMode = @bitCast(raw.payload) },
+        .SetTextureWindow => .{ .SetTextureWindow = @bitCast(raw.payload) },
+        .SetDrawingAreaTopLeft => .{ .SetDrawingAreaTopLeft = @bitCast(raw.payload) },
+        .SetDrawingAreaBottomRight => .{ .SetDrawingAreaBottomRight = @bitCast(raw.payload) },
+        .SetDrawingOffset => .{ .SetDrawingOffset = @bitCast(raw.payload) },
+        .SetMaskBitSetting => .{ .SetMaskBitSetting = @bitCast(raw.payload) },
         else => unreachable,
     };
 }
