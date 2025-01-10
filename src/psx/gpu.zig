@@ -95,11 +95,31 @@ pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: G1CommandRaw) void {
     std.debug.print("GP1 COMMAND value: 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
 
     switch (make_gp1_command(command_raw)) {
-        .SoftReset => {
+        .SoftReset => |soft_reset| {
             execute_soft_reset(psx);
+
+            std.debug.assert(soft_reset.zero_b0_23 == 0);
         },
         .SetDMADirection => |dma_direction| {
-            psx.mmio.gpu.GPUSTAT.dma_direction = dma_direction;
+            psx.mmio.gpu.GPUSTAT.dma_direction = dma_direction.dma_direction;
+
+            std.debug.assert(dma_direction.zero_b2_23 == 0);
+        },
+        .SetDisplayVRAMStart => |display_vram_start| {
+            psx.gpu.display_vram_x_start = display_vram_start.x;
+            psx.gpu.display_vram_y_start = display_vram_start.y;
+
+            std.debug.assert(display_vram_start.zero_b19_23 == 0);
+        },
+        .SetDisplayHorizontalRange => |display_horizontal_range| {
+            psx.gpu.display_horiz_start = display_horizontal_range.x1;
+            psx.gpu.display_horiz_end = display_horizontal_range.x2;
+        },
+        .SetDisplayVerticalRange => |display_vertical_range| {
+            psx.gpu.display_line_start = display_vertical_range.y1;
+            psx.gpu.display_line_end = display_vertical_range.y2;
+
+            std.debug.assert(display_vertical_range.zero_b20_23 == 0);
         },
         .SetDisplayMode => |display_mode| {
             psx.mmio.gpu.GPUSTAT.horizontal_resolution1 = display_mode.horizontal_resolution1;
@@ -109,7 +129,9 @@ pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: G1CommandRaw) void {
             psx.mmio.gpu.GPUSTAT.vertical_interlace = display_mode.vertical_interlace;
             psx.mmio.gpu.GPUSTAT.horizontal_resolution2 = display_mode.horizontal_resolution2;
             psx.mmio.gpu.GPUSTAT.reverse_flag = display_mode.reverse_flag;
+
             std.debug.assert(display_mode.reverse_flag == 0);
+            std.debug.assert(display_mode.zero_b8_23 == 0);
         },
         else => unreachable,
     }
@@ -200,6 +222,9 @@ fn make_gp0_command(raw: G0CommandRaw) G0Command {
 const G1OpCode = enum(u8) {
     SoftReset = 0x00,
     SetDMADirection = 0x04,
+    SetDisplayVRAMStart = 0x05,
+    SetDisplayHorizontalRange = 0x06,
+    SetDisplayVerticalRange = 0x07,
     SetDisplayMode = 0x08,
     _,
 };
@@ -210,8 +235,27 @@ const G1CommandRaw = packed struct {
 };
 
 const G1Command = union(G1OpCode) {
-    SoftReset,
-    SetDMADirection: mmio_gpu.MMIO.Packed.DMADirection,
+    SoftReset: packed struct {
+        zero_b0_23: u24,
+    },
+    SetDMADirection: packed struct {
+        dma_direction: mmio_gpu.MMIO.Packed.DMADirection,
+        zero_b2_23: u22,
+    },
+    SetDisplayVRAMStart: packed struct {
+        x: u10,
+        y: u9,
+        zero_b19_23: u5,
+    },
+    SetDisplayHorizontalRange: packed struct {
+        x1: u12,
+        x2: u12,
+    },
+    SetDisplayVerticalRange: packed struct {
+        y1: u10,
+        y2: u10,
+        zero_b20_23: u4,
+    },
     SetDisplayMode: packed struct {
         horizontal_resolution1: u2,
         vertical_resolution: mmio_gpu.MMIO.Packed.VerticalResolution,
@@ -220,14 +264,18 @@ const G1Command = union(G1OpCode) {
         vertical_interlace: u1,
         horizontal_resolution2: u1,
         reverse_flag: u1,
+        zero_b8_23: u16,
     },
 };
 
 fn make_gp1_command(raw: G1CommandRaw) G1Command {
     return switch (raw.op_code) {
-        .SoftReset => .{ .SoftReset = undefined },
-        .SetDMADirection => .{ .SetDMADirection = @enumFromInt(@as(u2, @truncate(raw.payload))) },
-        .SetDisplayMode => .{ .SetDisplayMode = @bitCast(@as(u8, @truncate(raw.payload))) },
+        .SoftReset => .{ .SoftReset = @bitCast(raw.payload) },
+        .SetDMADirection => .{ .SetDMADirection = @bitCast(raw.payload) },
+        .SetDisplayVRAMStart => .{ .SetDisplayVRAMStart = @bitCast(raw.payload) },
+        .SetDisplayHorizontalRange => .{ .SetDisplayHorizontalRange = @bitCast(raw.payload) },
+        .SetDisplayVerticalRange => .{ .SetDisplayVerticalRange = @bitCast(raw.payload) },
+        .SetDisplayMode => .{ .SetDisplayMode = @bitCast(raw.payload) },
         else => unreachable,
     };
 }
