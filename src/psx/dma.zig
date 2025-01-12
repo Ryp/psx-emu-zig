@@ -1,13 +1,13 @@
 const std = @import("std");
 
-const cpu = @import("cpu.zig");
-const io = @import("cpu_io.zig");
+const PSXState = @import("state.zig").PSXState;
+const mmio = @import("mmio.zig");
 const timers = @import("mmio_timers.zig");
 const gpu_execution = @import("gpu/execution.zig");
 
 // FIXME this might break if the type is not u32
-pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
-    const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
+pub fn load_mmio_generic(comptime T: type, psx: *PSXState, offset: u29) T {
+    const type_slice = mmio.get_mutable_mmio_slice_generic(T, psx, offset);
 
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
@@ -27,8 +27,8 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     }
 }
 
-pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, value: T) void {
-    const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
+pub fn store_mmio_generic(comptime T: type, psx: *PSXState, offset: u29, value: T) void {
+    const type_slice = mmio.get_mutable_mmio_slice_generic(T, psx, offset);
 
     std.debug.assert(offset >= MMIO.Offset);
     std.debug.assert(offset < MMIO.OffsetEnd);
@@ -90,7 +90,7 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
     }
 }
 
-fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index: DMAChannelIndex) void {
+fn execute_dma_transfer(psx: *PSXState, channel: *DMAChannel, channel_index: DMAChannelIndex) void {
     // std.debug.print("DMA Transfer {} in mode {}\n", .{ channel_index, channel.channel_control.sync_mode });
 
     switch (channel.channel_control.sync_mode) {
@@ -116,7 +116,7 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
                                     else => (address -% 4) & 0x00_1f_ff_ff,
                                 };
 
-                                io.store_mem_u32(psx, address_masked, src_word);
+                                mmio.store_mem_u32(psx, address_masked, src_word);
                             },
                             .Invalid => unreachable,
                         }
@@ -124,7 +124,7 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
                     .FromRAM => {
                         switch (channel_index) {
                             .Channel2_GPU => {
-                                // const src_word = io.load_mem_u32(psx, address_masked);
+                                // const src_word = mmio.load_mem_u32(psx, address_masked);
                                 // std.debug.print("GPU Data u32: 0x{x:08}\n", .{src_word}); // FIXME
                             },
                             .Channel0_MDEC_IN, .Channel1_MDEC_OUT, .Channel3_SPU, .Channel4_CDROM, .Channel5_PIO, .Channel6_OTC => {
@@ -151,11 +151,11 @@ fn execute_dma_transfer(psx: *cpu.PSXState, channel: *DMAChannel, channel_index:
             };
 
             while (true) {
-                const header: GPUCommandHeader = @bitCast(io.load_mem_u32(psx, header_address));
+                const header: GPUCommandHeader = @bitCast(mmio.load_mem_u32(psx, header_address));
 
                 for (0..header.word_count) |word_index| {
                     const command_word_address = (header_address + 4 * @as(u24, @intCast(word_index + 1))) & 0x1f_ff_fc;
-                    const command_word = io.load_mem_u32(psx, command_word_address);
+                    const command_word = mmio.load_mem_u32(psx, command_word_address);
 
                     gpu_execution.execute_gp0_write(psx, @bitCast(command_word));
                 }
@@ -209,7 +209,7 @@ const DMAChannelIndex = enum(u3) {
     Invalid,
 };
 
-fn get_dma_channel(psx: *cpu.PSXState, index: DMAChannelIndex) *DMAChannel {
+fn get_dma_channel(psx: *PSXState, index: DMAChannelIndex) *DMAChannel {
     return switch (index) {
         .Channel0_MDEC_IN => &psx.mmio.dma.channel0,
         .Channel1_MDEC_OUT => &psx.mmio.dma.channel1,

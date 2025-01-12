@@ -1,7 +1,6 @@
 const std = @import("std");
 
-const instructions = @import("cpu_instructions.zig");
-const cpu = @import("cpu.zig");
+const instructions = @import("instructions.zig");
 
 pub fn print_instruction(instruction: instructions.Instruction) void {
     switch (instruction) {

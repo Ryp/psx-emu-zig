@@ -1,15 +1,15 @@
 const std = @import("std");
 
-const cpu = @import("../cpu.zig");
-const io = @import("../cpu_io.zig");
+const PSXState = @import("../state.zig").PSXState;
+const mmio = @import("../mmio.zig");
 
 const execution = @import("execution.zig");
 
-pub fn load_mmio_u32(psx: *cpu.PSXState, offset: u29) u32 {
+pub fn load_mmio_u32(psx: *PSXState, offset: u29) u32 {
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
 
-    const type_slice = io.get_mutable_mmio_slice_generic(u32, psx, offset);
+    const type_slice = mmio.get_mutable_mmio_slice_generic(u32, psx, offset);
 
     switch (offset) {
         MMIO.GPUREAD_Offset => {
@@ -33,7 +33,7 @@ pub fn load_mmio_u32(psx: *cpu.PSXState, offset: u29) u32 {
     }
 }
 
-pub fn store_mmio_u32(psx: *cpu.PSXState, offset: u29, value: u32) void {
+pub fn store_mmio_u32(psx: *PSXState, offset: u29, value: u32) void {
     std.debug.assert(offset >= MMIO.Offset);
     std.debug.assert(offset < MMIO.OffsetEnd);
 
@@ -54,7 +54,7 @@ pub const MMIO = struct {
 
     pub const Packed = MMIO_GPU;
 
-    const SizeBytes = io.MMIO_MDEC_Offset - Offset;
+    const SizeBytes = mmio.MMIO_MDEC_Offset - Offset;
 
     const GPUREAD_Offset = 0x1f801810;
     const GPUSTAT_Offset = 0x1f801814;

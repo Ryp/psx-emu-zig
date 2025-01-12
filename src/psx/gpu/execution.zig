@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const cpu = @import("../cpu.zig");
+const PSXState = @import("../state.zig").PSXState;
 
 const g0 = @import("instructions_g0.zig");
 const g1 = @import("instructions_g1.zig");
@@ -32,7 +32,7 @@ pub const State = struct {
     display_line_end: u16 = 0x100, // FIXME Type
 };
 
-pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: g0.CommandRaw) void {
+pub fn execute_gp0_write(psx: *PSXState, command_raw: g0.CommandRaw) void {
     std.debug.print("GP0 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
 
     switch (g0.make_command(command_raw)) {
@@ -93,7 +93,7 @@ pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: g0.CommandRaw) void {
     }
 }
 
-pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: g1.CommandRaw) void {
+pub fn execute_gp1_write(psx: *PSXState, command_raw: g1.CommandRaw) void {
     std.debug.print("GP1 COMMAND value: 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
 
     switch (g1.make_command(command_raw)) {
@@ -139,7 +139,7 @@ pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: g1.CommandRaw) void {
     }
 }
 
-fn execute_soft_reset(psx: *cpu.PSXState) void {
+fn execute_soft_reset(psx: *PSXState) void {
     psx.gpu = .{};
     psx.mmio.gpu.GPUSTAT = .{};
     // FIXME clear command FIFO

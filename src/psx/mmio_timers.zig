@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const cpu = @import("cpu.zig");
-const io = @import("cpu_io.zig");
+const PSXState = @import("state.zig").PSXState;
+const mmio = @import("mmio.zig");
 
-pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
+pub fn load_mmio_generic(comptime T: type, psx: *PSXState, offset: u29) T {
     std.debug.assert(offset < MMIO.OffsetEnd);
     std.debug.assert(offset >= MMIO.Offset);
 
@@ -16,7 +16,7 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
             .Value, .Mode, .Target => {
                 std.debug.assert(T != u8);
 
-                const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
+                const type_slice = mmio.get_mutable_mmio_slice_generic(T, psx, offset);
 
                 return std.mem.readInt(T, type_slice, .little);
             },
@@ -27,7 +27,7 @@ pub fn load_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29) T {
     }
 }
 
-pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, value: T) void {
+pub fn store_mmio_generic(comptime T: type, psx: *PSXState, offset: u29, value: T) void {
     std.debug.assert(offset >= MMIO.Offset);
     std.debug.assert(offset < MMIO.OffsetEnd);
 
@@ -40,7 +40,7 @@ pub fn store_mmio_generic(comptime T: type, psx: *cpu.PSXState, offset: u29, val
             .Value, .Mode, .Target => {
                 std.debug.assert(T != u8);
 
-                const type_slice = io.get_mutable_mmio_slice_generic(T, psx, offset);
+                const type_slice = mmio.get_mutable_mmio_slice_generic(T, psx, offset);
 
                 // In case of u32 writes, just keep the full value in.
                 std.mem.writeInt(T, type_slice, value, .little);
@@ -73,7 +73,7 @@ const TimerIndex = enum(u2) {
     Invalid,
 };
 
-fn get_timer(psx: *cpu.PSXState, index: TimerIndex) *MMIO_Timers.Timer {
+fn get_timer(psx: *PSXState, index: TimerIndex) *MMIO_Timers.Timer {
     return switch (index) {
         .Timer0 => &psx.mmio.timers.timer0,
         .Timer1 => &psx.mmio.timers.timer1,
@@ -88,7 +88,7 @@ pub const MMIO = struct {
 
     pub const Packed = MMIO_Timers;
 
-    const SizeBytes = io.MMIO_CDROM_Offset - Offset;
+    const SizeBytes = mmio.MMIO_CDROM_Offset - Offset;
 
     comptime {
         std.debug.assert(@sizeOf(Packed) == SizeBytes);

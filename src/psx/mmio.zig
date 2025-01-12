@@ -1,11 +1,13 @@
 const std = @import("std");
 
-const cpu = @import("cpu.zig");
-const PSXState = cpu.PSXState;
+const psx_state = @import("state.zig");
+const PSXState = psx_state.PSXState;
 
 const dma = @import("dma.zig");
 const timers = @import("mmio_timers.zig");
 const gpu = @import("gpu/mmio.zig");
+
+const config = @import("config.zig");
 
 pub fn load_mem_u8(psx: *PSXState, address: u32) u8 {
     return load_mem_generic(u8, psx, @bitCast(address));
@@ -61,7 +63,7 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
     std.debug.assert(type_info.int.signedness == .unsigned);
     std.debug.assert(type_bits % 8 == 0);
 
-    if (cpu.enable_debug_print) {
+    if (config.enable_debug_print) {
         std.debug.print("load addr: 0x{x:0>8}\n", .{@as(u32, @bitCast(address))});
     }
 
@@ -81,7 +83,7 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
                         MMIO_InterruptStatus_Offset,
                         MMIO_SPU_Offset...MMIO_SPU_OffsetEnd - 1,
                         => {
-                            if (cpu.enable_debug_print) {
+                            if (config.enable_debug_print) {
                                 std.debug.print("FIXME load ignored\n", .{});
                             }
                             return 0;
@@ -122,7 +124,7 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    if (cpu.enable_debug_print) {
+                    if (config.enable_debug_print) {
                         std.debug.print("FIXME load ignored at cache control offset\n", .{});
                     }
                     return 0;
@@ -141,7 +143,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
     std.debug.assert(type_info.int.signedness == .unsigned);
     std.debug.assert(type_bits % 8 == 0);
 
-    if (cpu.enable_debug_print) {
+    if (config.enable_debug_print) {
         std.debug.print("store addr: 0x{x:0>8}\n", .{@as(u32, @bitCast(address))});
 
         // {{ and }} are escaped curly brackets
@@ -150,7 +152,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
     }
 
     if (psx.registers.sr.isolate_cache == 1) {
-        if (cpu.enable_debug_print) {
+        if (config.enable_debug_print) {
             std.debug.print("FIXME store ignored because of cache isolation\n", .{});
         }
         return;
@@ -183,7 +185,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
                         MMIO_SPU_Offset...MMIO_SPU_OffsetEnd - 1,
                         MMIO_UnknownDebug_Offset,
                         => {
-                            if (cpu.enable_debug_print) {
+                            if (config.enable_debug_print) {
                                 std.debug.print("FIXME store ignored\n", .{});
                             }
                         },
@@ -213,7 +215,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
         .Seg2 => {
             switch (address.offset) {
                 CacheControl_Offset => {
-                    if (cpu.enable_debug_print) {
+                    if (config.enable_debug_print) {
                         std.debug.print("FIXME store ignored at offset\n", .{});
                     }
                 },
@@ -226,7 +228,7 @@ fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, valu
 // KUSEG       KSEG0     KSEG1 Length Description
 // 0x00000000 0x80000000 0xa0000000 2048K Main RAM
 const RAM_Offset = 0x00000000;
-const RAM_OffsetEnd = RAM_Offset + cpu.RAM_SizeBytes;
+const RAM_OffsetEnd = RAM_Offset + psx_state.RAM_SizeBytes;
 
 // 0x1f000000 0x9f000000 0xbf000000 8192K Expansion Region 1
 const Expansion_SizeBytes = 8 * 1024 * 1024;
@@ -242,7 +244,7 @@ const Scratchpad_OffsetEnd = Scratchpad_Offset + Scratchpad_SizeBytes;
 
 // 0x1fc00000 0x9fc00000 0xbfc00000 512K BIOS ROM
 const BIOS_Offset = 0x1fc00000;
-const BIOS_OffsetEnd = BIOS_Offset + cpu.BIOS_SizeBytes;
+const BIOS_OffsetEnd = BIOS_Offset + psx_state.BIOS_SizeBytes;
 
 // 0x1ffe0130constant
 const CacheControl_Offset = 0x1ffe0130;

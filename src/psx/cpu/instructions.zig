@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const cpu = @import("cpu.zig");
+const cpu = @import("state.zig");
 
 // Opcode/Parameter Encoding
 //
