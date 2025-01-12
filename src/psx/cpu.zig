@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const io = @import("cpu_io.zig");
-const gpu = @import("gpu.zig");
+const gpu = @import("gpu/state.zig");
 
 pub const enable_debug_print = false;
 

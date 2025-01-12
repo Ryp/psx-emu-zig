@@ -5,7 +5,7 @@ const PSXState = cpu.PSXState;
 
 const dma = @import("dma.zig");
 const timers = @import("mmio_timers.zig");
-const gpu = @import("mmio_gpu.zig");
+const gpu = @import("gpu/mmio.zig");
 
 pub fn load_mem_u8(psx: *PSXState, address: u32) u8 {
     return load_mem_generic(u8, psx, @bitCast(address));

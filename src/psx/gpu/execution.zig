@@ -1,7 +1,9 @@
 const std = @import("std");
 
-const cpu = @import("cpu.zig");
-const mmio_gpu = @import("mmio_gpu.zig");
+const cpu = @import("../cpu.zig");
+
+const g0 = @import("instructions_g0.zig");
+const g1 = @import("instructions_g1.zig");
 
 pub const State = struct {
     texture_window_x_mask: u5 = 0,
@@ -30,10 +32,10 @@ pub const State = struct {
     display_line_end: u16 = 0x100, // FIXME Type
 };
 
-pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: G0CommandRaw) void {
+pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: g0.CommandRaw) void {
     std.debug.print("GP0 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
 
-    switch (make_gp0_command(command_raw)) {
+    switch (g0.make_command(command_raw)) {
         .Noop => {
             // Do nothing!
         },
@@ -91,10 +93,10 @@ pub fn execute_gp0_write(psx: *cpu.PSXState, command_raw: G0CommandRaw) void {
     }
 }
 
-pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: G1CommandRaw) void {
+pub fn execute_gp1_write(psx: *cpu.PSXState, command_raw: g1.CommandRaw) void {
     std.debug.print("GP1 COMMAND value: 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
 
-    switch (make_gp1_command(command_raw)) {
+    switch (g1.make_command(command_raw)) {
         .SoftReset => |soft_reset| {
             execute_soft_reset(psx);
 
@@ -142,140 +144,4 @@ fn execute_soft_reset(psx: *cpu.PSXState) void {
     psx.mmio.gpu.GPUSTAT = .{};
     // FIXME clear command FIFO
     // FIXME invalidate GPU cache
-}
-
-const G0OpCode = enum(u8) {
-    Noop = 0x00,
-    ClearTextureCache = 0x01,
-    SetDrawMode = 0xe1,
-    SetTextureWindow = 0xe2,
-    SetDrawingAreaTopLeft = 0xe3,
-    SetDrawingAreaBottomRight = 0xe4,
-    SetDrawingOffset = 0xe5,
-    SetMaskBitSetting = 0xe6,
-    _,
-};
-
-const G0CommandRaw = packed struct {
-    payload: u24,
-    op_code: G0OpCode,
-};
-
-const G0Command = union(G0OpCode) {
-    Noop,
-    ClearTextureCache,
-    SetDrawMode: packed struct {
-        texture_x_base: u4,
-        texture_y_base: u1,
-        semi_transparency: u2,
-        texture_page_colors: mmio_gpu.MMIO.Packed.TexturePageColors,
-        dither_mode: u1,
-        draw_to_display_area: u1,
-        texture_disable: u1,
-        rectangle_texture_x_flip: u1,
-        rectangle_texture_y_flip: u1,
-        zero_b14_23: u10,
-    },
-    SetTextureWindow: packed struct {
-        mask_x: u5,
-        mask_y: u5,
-        offset_x: u5,
-        offset_y: u5,
-        zero_b20_23: u4,
-    },
-    SetDrawingAreaTopLeft: packed struct {
-        left: u10,
-        top: u10,
-        zero_b20_23: u4,
-    },
-    SetDrawingAreaBottomRight: packed struct {
-        right: u10,
-        bottom: u10,
-        zero_b20_23: u4,
-    },
-    SetDrawingOffset: packed struct {
-        x: i11,
-        y: i11,
-        zero_b22_23: u2,
-    },
-    SetMaskBitSetting: packed struct {
-        set_mask_when_drawing: u1,
-        check_mask_before_drawing: u1,
-        zero_b2_23: u22,
-    },
-};
-
-fn make_gp0_command(raw: G0CommandRaw) G0Command {
-    return switch (raw.op_code) {
-        .Noop => .{ .Noop = undefined },
-        .ClearTextureCache => .{ .ClearTextureCache = undefined },
-        .SetDrawMode => .{ .SetDrawMode = @bitCast(raw.payload) },
-        .SetTextureWindow => .{ .SetTextureWindow = @bitCast(raw.payload) },
-        .SetDrawingAreaTopLeft => .{ .SetDrawingAreaTopLeft = @bitCast(raw.payload) },
-        .SetDrawingAreaBottomRight => .{ .SetDrawingAreaBottomRight = @bitCast(raw.payload) },
-        .SetDrawingOffset => .{ .SetDrawingOffset = @bitCast(raw.payload) },
-        .SetMaskBitSetting => .{ .SetMaskBitSetting = @bitCast(raw.payload) },
-        else => unreachable,
-    };
-}
-
-const G1OpCode = enum(u8) {
-    SoftReset = 0x00,
-    SetDMADirection = 0x04,
-    SetDisplayVRAMStart = 0x05,
-    SetDisplayHorizontalRange = 0x06,
-    SetDisplayVerticalRange = 0x07,
-    SetDisplayMode = 0x08,
-    _,
-};
-
-const G1CommandRaw = packed struct {
-    payload: u24,
-    op_code: G1OpCode,
-};
-
-const G1Command = union(G1OpCode) {
-    SoftReset: packed struct {
-        zero_b0_23: u24,
-    },
-    SetDMADirection: packed struct {
-        dma_direction: mmio_gpu.MMIO.Packed.DMADirection,
-        zero_b2_23: u22,
-    },
-    SetDisplayVRAMStart: packed struct {
-        x: u10,
-        y: u9,
-        zero_b19_23: u5,
-    },
-    SetDisplayHorizontalRange: packed struct {
-        x1: u12,
-        x2: u12,
-    },
-    SetDisplayVerticalRange: packed struct {
-        y1: u10,
-        y2: u10,
-        zero_b20_23: u4,
-    },
-    SetDisplayMode: packed struct {
-        horizontal_resolution1: u2,
-        vertical_resolution: mmio_gpu.MMIO.Packed.VerticalResolution,
-        video_mode: mmio_gpu.MMIO.Packed.VideoMode,
-        display_area_color_depth: mmio_gpu.MMIO.Packed.DisplayAreaColorDepth,
-        vertical_interlace: u1,
-        horizontal_resolution2: u1,
-        reverse_flag: u1,
-        zero_b8_23: u16,
-    },
-};
-
-fn make_gp1_command(raw: G1CommandRaw) G1Command {
-    return switch (raw.op_code) {
-        .SoftReset => .{ .SoftReset = @bitCast(raw.payload) },
-        .SetDMADirection => .{ .SetDMADirection = @bitCast(raw.payload) },
-        .SetDisplayVRAMStart => .{ .SetDisplayVRAMStart = @bitCast(raw.payload) },
-        .SetDisplayHorizontalRange => .{ .SetDisplayHorizontalRange = @bitCast(raw.payload) },
-        .SetDisplayVerticalRange => .{ .SetDisplayVerticalRange = @bitCast(raw.payload) },
-        .SetDisplayMode => .{ .SetDisplayMode = @bitCast(raw.payload) },
-        else => unreachable,
-    };
 }

@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const cpu = @import("cpu.zig");
-const io = @import("cpu_io.zig");
+const cpu = @import("../cpu.zig");
+const io = @import("../cpu_io.zig");
 
-const gpu = @import("gpu.zig");
+const execution = @import("execution.zig");
 
 pub fn load_mmio_u32(psx: *cpu.PSXState, offset: u29) u32 {
     std.debug.assert(offset < MMIO.OffsetEnd);
@@ -39,10 +39,10 @@ pub fn store_mmio_u32(psx: *cpu.PSXState, offset: u29, value: u32) void {
 
     switch (offset) {
         MMIO.G0_Offset => {
-            gpu.execute_gp0_write(psx, @bitCast(value));
+            execution.execute_gp0_write(psx, @bitCast(value));
         },
         MMIO.G1_Offset => {
-            gpu.execute_gp1_write(psx, @bitCast(value));
+            execution.execute_gp1_write(psx, @bitCast(value));
         },
         else => unreachable,
     }
