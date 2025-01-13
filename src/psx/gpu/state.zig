@@ -1,4 +1,4 @@
-pub const State = struct {
+pub const GPUState = struct {
     texture_window_x_mask: u5 = 0,
     texture_window_y_mask: u5 = 0,
     texture_window_x_offset: u5 = 0,

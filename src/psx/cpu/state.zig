@@ -1,3 +1,9 @@
+pub const CPUState = struct {
+    regs: Registers = .{},
+    branch: bool = false,
+    delay_slot: bool = false,
+};
+
 pub const Registers = struct {
     pc: u32 = 0xbfc00000, // Program Counter
     next_pc: u32 = 0xbfc00000 + 4, // Pipelined Program Counter

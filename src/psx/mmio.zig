@@ -151,7 +151,7 @@ fn store_generic(comptime T: type, psx: *PSXState, address: PSXAddress, value: T
         std.debug.print("store value: " ++ type_format_string ++ "\n", .{value});
     }
 
-    if (psx.registers.sr.isolate_cache == 1) {
+    if (psx.cpu.regs.sr.isolate_cache == 1) {
         if (config.enable_debug_print) {
             std.debug.print("FIXME store ignored because of cache isolation\n", .{});
         }

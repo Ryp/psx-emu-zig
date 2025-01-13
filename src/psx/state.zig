@@ -1,14 +1,12 @@
 const std = @import("std");
 
-const cpu = @import("cpu/state.zig");
-const gpu = @import("gpu/state.zig");
+const CPUState = @import("cpu/state.zig").CPUState;
+const GPUState = @import("gpu/state.zig").GPUState;
 const MMIO = @import("mmio.zig").MMIO;
 
 pub const PSXState = struct {
-    registers: cpu.Registers = .{},
-    branch: bool = false,
-    delay_slot: bool = false,
-    gpu: gpu.State = .{},
+    cpu: CPUState = .{},
+    gpu: GPUState = .{},
     mmio: MMIO = .{},
     ram: []u8,
     bios: [BIOS_SizeBytes]u8,
