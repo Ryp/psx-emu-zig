@@ -14,7 +14,7 @@ pub const PSXState = struct {
     gpu: gpu.State = .{},
 };
 
-pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) !PSXState {
+pub fn create_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) !PSXState {
     const ram = try allocator.alloc(u8, RAM_SizeBytes);
     errdefer allocator.free(ram);
 
@@ -24,7 +24,7 @@ pub fn create_psx_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) 
     };
 }
 
-pub fn destroy_psx_state(psx: *PSXState, allocator: std.mem.Allocator) void {
+pub fn destroy_state(psx: *PSXState, allocator: std.mem.Allocator) void {
     allocator.free(psx.ram);
 }
 
