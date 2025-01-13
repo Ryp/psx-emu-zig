@@ -1,17 +1,17 @@
 const std = @import("std");
 
-const mmio = @import("mmio.zig");
 const cpu = @import("cpu/state.zig");
 const gpu = @import("gpu/state.zig");
+const MMIO = @import("mmio.zig").MMIO;
 
 pub const PSXState = struct {
     registers: cpu.Registers = .{},
     branch: bool = false,
     delay_slot: bool = false,
-    bios: [BIOS_SizeBytes]u8,
-    ram: []u8,
-    mmio: mmio.MMIO = .{},
     gpu: gpu.State = .{},
+    mmio: MMIO = .{},
+    ram: []u8,
+    bios: [BIOS_SizeBytes]u8,
 };
 
 pub fn create_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) !PSXState {
@@ -19,8 +19,8 @@ pub fn create_state(bios: [BIOS_SizeBytes]u8, allocator: std.mem.Allocator) !PSX
     errdefer allocator.free(ram);
 
     return PSXState{
-        .bios = bios,
         .ram = ram,
+        .bios = bios,
     };
 }
 
