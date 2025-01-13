@@ -9,28 +9,28 @@ const gpu = @import("gpu/mmio.zig");
 
 const config = @import("config.zig");
 
-pub fn load_mem_u8(psx: *PSXState, address: u32) u8 {
-    return load_mem_generic(u8, psx, @bitCast(address));
+pub fn load_u8(psx: *PSXState, address: u32) u8 {
+    return load_generic(u8, psx, @bitCast(address));
 }
 
-pub fn load_mem_u16(psx: *PSXState, address: u32) u16 {
-    return load_mem_generic(u16, psx, @bitCast(address));
+pub fn load_u16(psx: *PSXState, address: u32) u16 {
+    return load_generic(u16, psx, @bitCast(address));
 }
 
-pub fn load_mem_u32(psx: *PSXState, address: u32) u32 {
-    return load_mem_generic(u32, psx, @bitCast(address));
+pub fn load_u32(psx: *PSXState, address: u32) u32 {
+    return load_generic(u32, psx, @bitCast(address));
 }
 
-pub fn store_mem_u8(psx: *PSXState, address: u32, value: u8) void {
-    store_mem_generic(u8, psx, @bitCast(address), value);
+pub fn store_u8(psx: *PSXState, address: u32, value: u8) void {
+    store_generic(u8, psx, @bitCast(address), value);
 }
 
-pub fn store_mem_u16(psx: *PSXState, address: u32, value: u16) void {
-    store_mem_generic(u16, psx, @bitCast(address), value);
+pub fn store_u16(psx: *PSXState, address: u32, value: u16) void {
+    store_generic(u16, psx, @bitCast(address), value);
 }
 
-pub fn store_mem_u32(psx: *PSXState, address: u32, value: u32) void {
-    store_mem_generic(u32, psx, @bitCast(address), value);
+pub fn store_u32(psx: *PSXState, address: u32, value: u32) void {
+    store_generic(u32, psx, @bitCast(address), value);
 }
 
 // FIXME check if this is legal
@@ -55,7 +55,7 @@ pub const PSXAddress = packed struct {
 };
 
 // FIXME does cache isolation has any impact here?
-fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
+fn load_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
     const type_info = @typeInfo(T);
     const type_bits = type_info.int.bits;
     const type_bytes = type_bits / 8;
@@ -135,7 +135,7 @@ fn load_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress) T {
     }
 }
 
-fn store_mem_generic(comptime T: type, psx: *PSXState, address: PSXAddress, value: T) void {
+fn store_generic(comptime T: type, psx: *PSXState, address: PSXAddress, value: T) void {
     const type_info = @typeInfo(T);
     const type_bits = type_info.int.bits;
     const type_bytes = type_bits / 8;

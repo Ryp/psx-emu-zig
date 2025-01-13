@@ -19,7 +19,7 @@ pub fn step(psx: *PSXState) void {
         return;
     }
 
-    const op_code = mmio.load_mem_u32(psx, psx.registers.pc);
+    const op_code = mmio.load_u32(psx, psx.registers.pc);
 
     psx.registers.pc = psx.registers.next_pc;
     psx.registers.next_pc +%= 4;
@@ -543,7 +543,7 @@ fn execute_lb(psx: *PSXState, instruction: instructions.lb) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    const value: i8 = @bitCast(mmio.load_mem_u8(psx, address));
+    const value: i8 = @bitCast(mmio.load_u8(psx, address));
     const value_sign_extended: i32 = value;
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
@@ -553,7 +553,7 @@ fn execute_lbu(psx: *PSXState, instruction: instructions.lbu) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    const value: u8 = mmio.load_mem_u8(psx, address);
+    const value: u8 = mmio.load_u8(psx, address);
 
     psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
 }
@@ -563,7 +563,7 @@ fn execute_lh(psx: *PSXState, instruction: instructions.lh) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 2 == 0) {
-        const value: i16 = @bitCast(mmio.load_mem_u16(psx, address));
+        const value: i16 = @bitCast(mmio.load_u16(psx, address));
         const value_sign_extended: i32 = value;
 
         psx.registers.pending_load = .{ .register = instruction.rt, .value = @bitCast(value_sign_extended) };
@@ -577,7 +577,7 @@ fn execute_lhu(psx: *PSXState, instruction: instructions.lhu) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 2 == 0) {
-        const value = mmio.load_mem_u16(psx, address);
+        const value = mmio.load_u16(psx, address);
 
         psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
     } else {
@@ -590,7 +590,7 @@ fn execute_lw(psx: *PSXState, instruction: instructions.lw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 4 == 0) {
-        const value = mmio.load_mem_u32(psx, address);
+        const value = mmio.load_u32(psx, address);
 
         psx.registers.pending_load = .{ .register = instruction.rt, .value = value };
     } else {
@@ -603,7 +603,7 @@ fn execute_lwl(psx: *PSXState, instruction: instructions.lwl) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
     const address_aligned = address & ~@as(u32, 0b11);
 
-    const load_value = mmio.load_mem_u32(psx, address_aligned);
+    const load_value = mmio.load_u32(psx, address_aligned);
 
     const previous_value = if (psx.registers.pending_load) |pending_load|
         if (pending_load.is_unaligned) pending_load.value else 0
@@ -626,7 +626,7 @@ fn execute_lwr(psx: *PSXState, instruction: instructions.lwr) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
     const address_aligned = address & ~@as(u32, 0b11);
 
-    const load_value = mmio.load_mem_u32(psx, address_aligned);
+    const load_value = mmio.load_u32(psx, address_aligned);
 
     const previous_value = if (psx.registers.pending_load) |pending_load|
         if (pending_load.is_unaligned) pending_load.value else 0
@@ -650,7 +650,7 @@ fn execute_sb(psx: *PSXState, instruction: instructions.sb) void {
     const address_base = load_reg(psx.registers, instruction.rs);
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
-    mmio.store_mem_u8(psx, address, @truncate(value));
+    mmio.store_u8(psx, address, @truncate(value));
 }
 
 fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
@@ -660,7 +660,7 @@ fn execute_sh(psx: *PSXState, instruction: instructions.sh) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 2 == 0) {
-        mmio.store_mem_u16(psx, address, @truncate(value));
+        mmio.store_u16(psx, address, @truncate(value));
     } else {
         execute_exception(psx, .AdES);
     }
@@ -673,7 +673,7 @@ fn execute_sw(psx: *PSXState, instruction: instructions.sw) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
 
     if (address % 4 == 0) {
-        mmio.store_mem_u32(psx, address, value);
+        mmio.store_u32(psx, address, value);
     } else {
         execute_exception(psx, .AdES);
     }
@@ -686,7 +686,7 @@ fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
     const address_aligned = address & ~@as(u32, 0b11);
 
-    const previous_value = mmio.load_mem_u32(psx, address_aligned);
+    const previous_value = mmio.load_u32(psx, address_aligned);
 
     const result = switch (address % 4) {
         0 => previous_value & 0xff_ff_ff_00 | value >> 24,
@@ -696,7 +696,7 @@ fn execute_swl(psx: *PSXState, instruction: instructions.swl) void {
         else => unreachable,
     };
 
-    mmio.store_mem_u32(psx, address_aligned, result);
+    mmio.store_u32(psx, address_aligned, result);
 }
 
 fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
@@ -706,7 +706,7 @@ fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
     const address = wrapping_add_u32_i32(address_base, instruction.imm_i16);
     const address_aligned = address & ~@as(u32, 0b11);
 
-    const previous_value = mmio.load_mem_u32(psx, address_aligned);
+    const previous_value = mmio.load_u32(psx, address_aligned);
 
     const result = switch (address % 4) {
         0 => previous_value & 0x00_00_00_00 | value << 0,
@@ -716,7 +716,7 @@ fn execute_swr(psx: *PSXState, instruction: instructions.swr) void {
         else => unreachable,
     };
 
-    mmio.store_mem_u32(psx, address_aligned, result);
+    mmio.store_u32(psx, address_aligned, result);
 }
 
 fn execute_mfhi(psx: *PSXState, instruction: instructions.mfhi) void {

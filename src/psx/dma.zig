@@ -116,7 +116,7 @@ fn execute_dma_transfer(psx: *PSXState, channel: *DMAChannel, channel_index: DMA
                                     else => (address -% 4) & 0x00_1f_ff_ff,
                                 };
 
-                                mmio.store_mem_u32(psx, address_masked, src_word);
+                                mmio.store_u32(psx, address_masked, src_word);
                             },
                             .Invalid => unreachable,
                         }
@@ -124,7 +124,7 @@ fn execute_dma_transfer(psx: *PSXState, channel: *DMAChannel, channel_index: DMA
                     .FromRAM => {
                         switch (channel_index) {
                             .Channel2_GPU => {
-                                // const src_word = mmio.load_mem_u32(psx, address_masked);
+                                // const src_word = mmio.load_u32(psx, address_masked);
                                 // std.debug.print("GPU Data u32: 0x{x:08}\n", .{src_word}); // FIXME
                             },
                             .Channel0_MDEC_IN, .Channel1_MDEC_OUT, .Channel3_SPU, .Channel4_CDROM, .Channel5_PIO, .Channel6_OTC => {
@@ -151,11 +151,11 @@ fn execute_dma_transfer(psx: *PSXState, channel: *DMAChannel, channel_index: DMA
             };
 
             while (true) {
-                const header: GPUCommandHeader = @bitCast(mmio.load_mem_u32(psx, header_address));
+                const header: GPUCommandHeader = @bitCast(mmio.load_u32(psx, header_address));
 
                 for (0..header.word_count) |word_index| {
                     const command_word_address = (header_address + 4 * @as(u24, @intCast(word_index + 1))) & 0x1f_ff_fc;
-                    const command_word = mmio.load_mem_u32(psx, command_word_address);
+                    const command_word = mmio.load_u32(psx, command_word_address);
 
                     gpu_execution.execute_gp0_write(psx, @bitCast(command_word));
                 }
