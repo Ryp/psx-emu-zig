@@ -157,7 +157,7 @@ fn execute_dma_transfer(psx: *PSXState, channel: *DMAChannel, channel_index: DMA
                     const command_word_address = (header_address + 4 * @as(u24, @intCast(word_index + 1))) & 0x1f_ff_fc;
                     const command_word = mmio.load_u32(psx, command_word_address);
 
-                    gpu_execution.execute_gp0_write(psx, @bitCast(command_word));
+                    gpu_execution.store_gp0_u32(psx, command_word);
                 }
 
                 // Look for end-of-list marker (mednafen does this instead of checking for 0x00_ff_ff_ff)

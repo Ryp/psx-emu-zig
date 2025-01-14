@@ -1,3 +1,5 @@
+const g0 = @import("instructions_g0.zig");
+
 pub const GPUState = struct {
     texture_window_x_mask: u5 = 0,
     texture_window_y_mask: u5 = 0,
@@ -23,4 +25,11 @@ pub const GPUState = struct {
 
     display_line_start: u16 = 0x10, // FIXME Type
     display_line_end: u16 = 0x100, // FIXME Type
+
+    gp0_pending_bytes: [g0.MaxCommandSizeBytes]u8 = undefined,
+    gp0_pending_command: ?struct {
+        op_code: g0.OpCode,
+        current_byte_index: usize,
+        command_size_bytes: usize,
+    } = null,
 };

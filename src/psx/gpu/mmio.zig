@@ -39,10 +39,10 @@ pub fn store_mmio_u32(psx: *PSXState, offset: u29, value: u32) void {
 
     switch (offset) {
         MMIO.G0_Offset => {
-            execution.execute_gp0_write(psx, @bitCast(value));
+            execution.store_gp0_u32(psx, value);
         },
         MMIO.G1_Offset => {
-            execution.execute_gp1_write(psx, @bitCast(value));
+            execution.execute_gp1_command(psx, @bitCast(value));
         },
         else => unreachable,
     }

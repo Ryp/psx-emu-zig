@@ -5,17 +5,70 @@ const PSXState = @import("../state.zig").PSXState;
 const g0 = @import("instructions_g0.zig");
 const g1 = @import("instructions_g1.zig");
 
-pub fn execute_gp0_write(psx: *PSXState, command_raw: g0.CommandRaw) void {
-    std.debug.print("GP0 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
+// FIXME be very careful with endianness here
+pub fn store_gp0_u32(psx: *PSXState, value: u32) void {
+    if (psx.gpu.gp0_pending_command == null) {
+        const op_code: g0.OpCode = @enumFromInt(value >> 24);
+        const command_size_bytes = g0.command_size_bytes(op_code);
 
-    switch (g0.make_command(command_raw)) {
+        psx.gpu.gp0_pending_command = .{
+            .op_code = op_code,
+            .current_byte_index = 0,
+            .command_size_bytes = command_size_bytes,
+        };
+
+        std.debug.print("New GP0 command: op = {}, bytes = {}\n", .{ op_code, command_size_bytes });
+    }
+
+    std.debug.print("GP0 write: 0x{x:0>8}\n", .{value});
+
+    // We have to have a valid command at this point
+    const pending_command = if (psx.gpu.gp0_pending_command) |*pending_command| pending_command else unreachable;
+
+    // Write current u32 to the pending command buffer
+    std.mem.writeInt(u32, psx.gpu.gp0_pending_bytes[pending_command.current_byte_index..][0..4], value, .little);
+
+    pending_command.current_byte_index += @sizeOf(u32);
+
+    // Check if we wrote enough bytes to dispatch a command
+    if (pending_command.current_byte_index == pending_command.command_size_bytes) {
+        const command_bytes = psx.gpu.gp0_pending_bytes[0..pending_command.command_size_bytes];
+
+        execute_gp0_command(psx, pending_command.op_code, command_bytes);
+
+        psx.gpu.gp0_pending_command = null;
+    }
+}
+
+fn execute_gp0_command(psx: *PSXState, op_code: g0.OpCode, command_bytes: []u8) void {
+    switch (op_code) {
         .Noop => {
+            const noop = std.mem.bytesAsValue(g0.Noop, command_bytes);
+            _ = noop.unknown_b0_23;
+
             // Do nothing!
         },
         .ClearTextureCache => {
-            unreachable;
+            const clear_texture_cache = std.mem.bytesAsValue(g0.ClearTextureCache, command_bytes);
+            std.debug.assert(clear_texture_cache.zero_b0_23 == 0);
+
+            unreachable; // FIXME
         },
-        .SetDrawMode => |draw_mode| {
+        .DrawTriangleMonochromeOpaque, .DrawTriangleMonochromeTransparent => {
+            const draw_triangle_monochrome = std.mem.bytesAsValue(g0.DrawTriangleMonochrome, command_bytes);
+            _ = draw_triangle_monochrome;
+
+            unreachable; // FIXME
+        },
+        .DrawQuadMonochromeOpaque, .DrawQuadMonochromeTransparent => {
+            const draw_quad_monochrome = std.mem.bytesAsValue(g0.DrawQuadMonochrome, command_bytes);
+            _ = draw_quad_monochrome;
+
+            unreachable; // FIXME
+        },
+        .SetDrawMode => {
+            const draw_mode = std.mem.bytesAsValue(g0.SetDrawMode, command_bytes);
+
             psx.mmio.gpu.GPUSTAT.texture_x_base = draw_mode.texture_x_base;
             psx.mmio.gpu.GPUSTAT.texture_y_base = draw_mode.texture_y_base;
             psx.mmio.gpu.GPUSTAT.semi_transparency = draw_mode.semi_transparency;
@@ -30,7 +83,9 @@ pub fn execute_gp0_write(psx: *PSXState, command_raw: g0.CommandRaw) void {
             std.debug.assert(draw_mode.texture_page_colors != .Reserved);
             std.debug.assert(draw_mode.zero_b14_23 == 0);
         },
-        .SetTextureWindow => |texture_window| {
+        .SetTextureWindow => {
+            const texture_window = std.mem.bytesAsValue(g0.SetTextureWindow, command_bytes);
+
             psx.gpu.texture_window_x_mask = texture_window.mask_x;
             psx.gpu.texture_window_y_mask = texture_window.mask_y;
             psx.gpu.texture_window_x_offset = texture_window.offset_x;
@@ -38,35 +93,43 @@ pub fn execute_gp0_write(psx: *PSXState, command_raw: g0.CommandRaw) void {
 
             std.debug.assert(texture_window.zero_b20_23 == 0);
         },
-        .SetDrawingAreaTopLeft => |drawing_area| {
+        .SetDrawingAreaTopLeft => {
+            const drawing_area = std.mem.bytesAsValue(g0.SetDrawingAreaTopLeft, command_bytes);
+
             psx.gpu.drawing_area_left = drawing_area.left;
             psx.gpu.drawing_area_top = drawing_area.top;
 
             std.debug.assert(drawing_area.zero_b20_23 == 0);
         },
-        .SetDrawingAreaBottomRight => |drawing_area| {
+        .SetDrawingAreaBottomRight => {
+            const drawing_area = std.mem.bytesAsValue(g0.SetDrawingAreaBottomRight, command_bytes);
+
             psx.gpu.drawing_area_right = drawing_area.right;
             psx.gpu.drawing_area_bottom = drawing_area.bottom;
 
             std.debug.assert(drawing_area.zero_b20_23 == 0);
         },
-        .SetDrawingOffset => |drawing_offset| {
+        .SetDrawingOffset => {
+            const drawing_offset = std.mem.bytesAsValue(g0.SetDrawingOffset, command_bytes);
+
             psx.gpu.drawing_x_offset = drawing_offset.x;
             psx.gpu.drawing_y_offset = drawing_offset.y;
 
             std.debug.assert(drawing_offset.zero_b22_23 == 0);
         },
-        .SetMaskBitSetting => |mask_bit_setting| {
+        .SetMaskBitSetting => {
+            const mask_bit_setting = std.mem.bytesAsValue(g0.SetMaskBitSetting, command_bytes);
+
             psx.mmio.gpu.GPUSTAT.set_mask_when_drawing = mask_bit_setting.set_mask_when_drawing;
             psx.mmio.gpu.GPUSTAT.check_mask_before_drawing = mask_bit_setting.check_mask_before_drawing;
 
             std.debug.assert(mask_bit_setting.zero_b2_23 == 0);
         },
-        else => unreachable,
+        _ => unreachable,
     }
 }
 
-pub fn execute_gp1_write(psx: *PSXState, command_raw: g1.CommandRaw) void {
+pub fn execute_gp1_command(psx: *PSXState, command_raw: g1.CommandRaw) void {
     std.debug.print("GP1 COMMAND value: 0x{x:0>8}\n", .{@as(u32, @bitCast(command_raw))});
 
     switch (g1.make_command(command_raw)) {
