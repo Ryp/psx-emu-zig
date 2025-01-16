@@ -192,9 +192,18 @@ pub fn execute_gp1_command(psx: *PSXState, command_raw: g1.CommandRaw) void {
 
     switch (g1.make_command(command_raw)) {
         .SoftReset => |soft_reset| {
-            execute_soft_reset(psx);
+            execute_reset(psx);
 
             std.debug.assert(soft_reset.zero_b0_23 == 0);
+        },
+        .CommandBufferReset => |command_buffer_reset| {
+            execute_reset_command_buffer(psx);
+
+            std.debug.assert(command_buffer_reset.zero_b0_23 == 0);
+        },
+        .AcknowledgeInterrupt => |acknowledge_interrupt| {
+            std.debug.assert(acknowledge_interrupt.zero_b0_23 == 0);
+            // FIXME
         },
         .SetDisplayEnabled => |display_enabled| {
             psx.mmio.gpu.GPUSTAT.display_enabled = display_enabled.display_enabled;
@@ -238,9 +247,16 @@ pub fn execute_gp1_command(psx: *PSXState, command_raw: g1.CommandRaw) void {
     }
 }
 
-fn execute_soft_reset(psx: *PSXState) void {
+fn execute_reset(psx: *PSXState) void {
     psx.gpu = .{};
     psx.mmio.gpu.GPUSTAT = .{};
-    // FIXME clear command FIFO
+
+    execute_reset_command_buffer(psx);
     // FIXME invalidate GPU cache
+}
+
+fn execute_reset_command_buffer(psx: *PSXState) void {
+    psx.gpu.gp0_pending_command = null;
+    psx.gpu.gp0_copy_mode = null;
+    // FIXME clear command FIFO
 }

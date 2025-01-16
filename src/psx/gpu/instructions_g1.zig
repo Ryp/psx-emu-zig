@@ -2,6 +2,8 @@ const mmio = @import("mmio.zig");
 
 pub const OpCode = enum(u8) {
     SoftReset = 0x00,
+    CommandBufferReset = 0x01,
+    AcknowledgeInterrupt = 0x02,
     SetDisplayEnabled = 0x03,
     SetDMADirection = 0x04,
     SetDisplayVRAMStart = 0x05,
@@ -18,6 +20,12 @@ pub const CommandRaw = packed struct {
 
 const Command = union(OpCode) {
     SoftReset: packed struct {
+        zero_b0_23: u24,
+    },
+    CommandBufferReset: packed struct {
+        zero_b0_23: u24,
+    },
+    AcknowledgeInterrupt: packed struct {
         zero_b0_23: u24,
     },
     SetDisplayEnabled: packed struct {
@@ -57,6 +65,8 @@ const Command = union(OpCode) {
 pub fn make_command(raw: CommandRaw) Command {
     return switch (raw.op_code) {
         .SoftReset => .{ .SoftReset = @bitCast(raw.payload) },
+        .CommandBufferReset => .{ .CommandBufferReset = @bitCast(raw.payload) },
+        .AcknowledgeInterrupt => .{ .AcknowledgeInterrupt = @bitCast(raw.payload) },
         .SetDisplayEnabled => .{ .SetDisplayEnabled = @bitCast(raw.payload) },
         .SetDMADirection => .{ .SetDMADirection = @bitCast(raw.payload) },
         .SetDisplayVRAMStart => .{ .SetDisplayVRAMStart = @bitCast(raw.payload) },
