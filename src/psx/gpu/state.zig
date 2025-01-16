@@ -32,4 +32,10 @@ pub const GPUState = struct {
         current_byte_index: usize,
         command_size_bytes: usize,
     } = null,
+
+    gp0_copy_mode: ?struct {
+        command: g0.CopyRectangleAcrossCPU,
+        index_x: usize,
+        index_y: usize,
+    } = null,
 };

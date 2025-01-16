@@ -7,7 +7,9 @@ const g1 = @import("instructions_g1.zig");
 
 // FIXME be very careful with endianness here
 pub fn store_gp0_u32(psx: *PSXState, value: u32) void {
-    if (psx.gpu.gp0_pending_command == null) {
+    std.debug.print("GP0 write: 0x{x:0>8}\n", .{value});
+
+    if (psx.gpu.gp0_pending_command == null and psx.gpu.gp0_copy_mode == null) {
         const op_code: g0.OpCode = @enumFromInt(value >> 24);
         const command_size_bytes = g0.command_size_bytes(op_code);
 
@@ -20,23 +22,39 @@ pub fn store_gp0_u32(psx: *PSXState, value: u32) void {
         std.debug.print("New GP0 command: op = {}, bytes = {}\n", .{ op_code, command_size_bytes });
     }
 
-    std.debug.print("GP0 write: 0x{x:0>8}\n", .{value});
+    if (psx.gpu.gp0_copy_mode) |*copy_mode| {
+        for (0..2) |_| {
+            // FIXME Write!!!
+            copy_mode.index_x += 1;
 
-    // We have to have a valid command at this point
-    const pending_command = if (psx.gpu.gp0_pending_command) |*pending_command| pending_command else unreachable;
+            if (copy_mode.index_x == copy_mode.command.extent_x) {
+                copy_mode.index_x = 0;
+                copy_mode.index_y += 1;
+            }
 
-    // Write current u32 to the pending command buffer
-    std.mem.writeInt(u32, psx.gpu.gp0_pending_bytes[pending_command.current_byte_index..][0..4], value, .little);
+            // Check for end condition
+            if (copy_mode.index_y == copy_mode.command.extent_y) {
+                psx.gpu.gp0_copy_mode = null;
+                break;
+            }
+        }
+    } else {
+        // We have to have a valid command at this point
+        const pending_command = if (psx.gpu.gp0_pending_command) |*pending_command| pending_command else unreachable;
 
-    pending_command.current_byte_index += @sizeOf(u32);
+        // Write current u32 to the pending command buffer
+        std.mem.writeInt(u32, psx.gpu.gp0_pending_bytes[pending_command.current_byte_index..][0..4], value, .little);
 
-    // Check if we wrote enough bytes to dispatch a command
-    if (pending_command.current_byte_index == pending_command.command_size_bytes) {
-        const command_bytes = psx.gpu.gp0_pending_bytes[0..pending_command.command_size_bytes];
+        pending_command.current_byte_index += @sizeOf(u32);
 
-        execute_gp0_command(psx, pending_command.op_code, command_bytes);
+        // Check if we wrote enough bytes to dispatch a command
+        if (pending_command.current_byte_index == pending_command.command_size_bytes) {
+            const command_bytes = psx.gpu.gp0_pending_bytes[0..pending_command.command_size_bytes];
 
-        psx.gpu.gp0_pending_command = null;
+            execute_gp0_command(psx, pending_command.op_code, command_bytes);
+
+            psx.gpu.gp0_pending_command = null;
+        }
     }
 }
 
@@ -52,19 +70,59 @@ fn execute_gp0_command(psx: *PSXState, op_code: g0.OpCode, command_bytes: []u8) 
             const clear_texture_cache = std.mem.bytesAsValue(g0.ClearTextureCache, command_bytes);
             std.debug.assert(clear_texture_cache.zero_b0_23 == 0);
 
-            unreachable; // FIXME
+            // FIXME ignore for now
+            // unreachable; // FIXME
         },
         .DrawTriangleMonochromeOpaque, .DrawTriangleMonochromeTransparent => {
             const draw_triangle_monochrome = std.mem.bytesAsValue(g0.DrawTriangleMonochrome, command_bytes);
             _ = draw_triangle_monochrome;
-
-            unreachable; // FIXME
+            // unreachable; // FIXME
         },
         .DrawQuadMonochromeOpaque, .DrawQuadMonochromeTransparent => {
             const draw_quad_monochrome = std.mem.bytesAsValue(g0.DrawQuadMonochrome, command_bytes);
             _ = draw_quad_monochrome;
+            //unreachable; // FIXME
+        },
+        .DrawTriangleTexturedOpaqueBlended, .DrawTriangleTexturedOpaque, .DrawTriangleTexturedTransparentBlended, .DrawTriangleTexturedTransparent => {
+            const draw_triangle_textured = std.mem.bytesAsValue(g0.DrawTriangleTextured, command_bytes);
+            _ = draw_triangle_textured;
+            //unreachable; // FIXME
+        },
+        .DrawQuadTexturedOpaqueBlended, .DrawQuadTexturedOpaque, .DrawQuadTexturedTransparentBlended, .DrawQuadTexturedTransparent => {
+            const draw_quad_textured = std.mem.bytesAsValue(g0.DrawQuadTextured, command_bytes);
+            _ = draw_quad_textured;
+            //unreachable; // FIXME
+        },
+        .DrawTriangleShadedOpaque, .DrawTriangleShadedTransparent => {
+            const draw_triangle_shaded = std.mem.bytesAsValue(g0.DrawTriangleShaded, command_bytes);
+            _ = draw_triangle_shaded;
+            //unreachable; // FIXME
+        },
+        .DrawQuadShadedOpaque, .DrawQuadShadedTransparent => {
+            const draw_quad_shaded = std.mem.bytesAsValue(g0.DrawQuadShaded, command_bytes);
+            _ = draw_quad_shaded;
+            //unreachable; // FIXME
+        },
+        .CopyRectangleVRAMtoCPU => {
+            const copy_rectangle = std.mem.bytesAsValue(g0.CopyRectangleAcrossCPU, command_bytes);
+            std.debug.assert(copy_rectangle.zero_b0_23 == 0);
 
-            unreachable; // FIXME
+            // FIXME FIXME FIXME
+            //unreachable; // FIXME
+        },
+        .CopyRectangleCPUtoVRAM => {
+            const copy_rectangle = std.mem.bytesAsValue(g0.CopyRectangleAcrossCPU, command_bytes);
+
+            std.debug.assert(copy_rectangle.extent_x > 0);
+            std.debug.assert(copy_rectangle.extent_y > 0);
+
+            psx.gpu.gp0_copy_mode = .{
+                .command = copy_rectangle.*,
+                .index_x = 0,
+                .index_y = 0,
+            };
+
+            std.debug.assert(copy_rectangle.zero_b0_23 == 0);
         },
         .SetDrawMode => {
             const draw_mode = std.mem.bytesAsValue(g0.SetDrawMode, command_bytes);
@@ -137,6 +195,11 @@ pub fn execute_gp1_command(psx: *PSXState, command_raw: g1.CommandRaw) void {
             execute_soft_reset(psx);
 
             std.debug.assert(soft_reset.zero_b0_23 == 0);
+        },
+        .SetDisplayEnabled => |display_enabled| {
+            psx.mmio.gpu.GPUSTAT.display_enabled = display_enabled.display_enabled;
+
+            std.debug.assert(display_enabled.zero_b1_23 == 0);
         },
         .SetDMADirection => |dma_direction| {
             psx.mmio.gpu.GPUSTAT.dma_direction = dma_direction.dma_direction;

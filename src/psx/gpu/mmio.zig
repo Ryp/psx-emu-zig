@@ -27,7 +27,13 @@ pub fn load_mmio_u32(psx: *PSXState, offset: u29) u32 {
                 .VRAMtoCPU => psx.mmio.gpu.GPUSTAT.ready_to_send_vram_to_cpu,
             };
 
-            return std.mem.readInt(u32, type_slice, .little);
+            // FIXME Force vertical res to 240 lines to continue BIOS execution without proper sync support.
+            var stat_value = psx.mmio.gpu.GPUSTAT;
+            stat_value.vertical_resolution = ._240lines; // FIXME
+            const stat_u32: u32 = @bitCast(stat_value);
+            return stat_u32;
+
+            // return std.mem.readInt(u32, type_slice, .little);
         },
         else => unreachable,
     }
@@ -95,10 +101,7 @@ const MMIO_GPU = packed struct {
         video_mode: VideoMode = .NTSC, //   20    Video Mode                  (0=NTSC/60Hz, 1=PAL/50Hz)     ;GP1(08h).3
         display_area_color_depth: DisplayAreaColorDepth = ._15bits, //   21    Display Area Color Depth    (0=15bit, 1=24bit)            ;GP1(08h).4
         vertical_interlace: u1 = 1, //   22    Vertical Interlace          (0=Off, 1=On)                 ;GP1(08h).5
-        display_toggle: enum(u1) { //   23    Display Enable              (0=Enabled, 1=Disabled)       ;GP1(03h).0
-            Enabled = 0,
-            Disabled = 1,
-        } = .Disabled,
+        display_enabled: DisplayState = .Disabled, //   23    Display Enable              (0=Enabled, 1=Disabled)       ;GP1(03h).0
         interrupt_request: u1 = 0, //   24    Interrupt Request (IRQ1)    (0=Off, 1=IRQ)       ;GP0(1Fh)/GP1(02h)
         dma_data_request_mode: u1 = 0, //   25    DMA / Data Request, meaning depends on GP1(04h) DMA Direction:
         // When GP1(04h)=0 ---> Always zero (0)
@@ -148,6 +151,11 @@ const MMIO_GPU = packed struct {
     pub const DisplayAreaColorDepth = enum(u1) {
         _15bits = 0,
         _24bits = 1,
+    };
+
+    pub const DisplayState = enum(u1) {
+        Enabled = 0,
+        Disabled = 1,
     };
 
     pub const DMADirection = enum(u2) {
