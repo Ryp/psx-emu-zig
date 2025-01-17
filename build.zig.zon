@@ -1,0 +1,14 @@
+.{
+    .name = "psx-emu",
+    .version = "0.1.0",
+    .minimum_zig_version = "0.14.0",
+    .dependencies = .{
+        .vulkan_zig = .{
+            .path = "external/vulkan-zig",
+        },
+        .vulkan_headers = .{
+            .path = "external/Vulkan-Headers",
+        },
+    },
+    .paths = .{""},
+}
