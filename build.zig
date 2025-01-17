@@ -37,10 +37,25 @@ pub fn build(b: *std.Build) void {
         vk_generate_cmd.addFileArg(registry_path);
 
         exe.linkSystemLibrary("glfw");
-        exe.linkSystemLibrary("xcb");
 
         exe.root_module.addAnonymousImport("vulkan", .{
             .root_source_file = vk_generate_cmd.addOutputFileArg("vk.zig"),
+        });
+
+        const vert_cmd = b.addSystemCommand(&.{ "glslc", "--target-env=vulkan1.2", "-o" });
+
+        const vert_spv = vert_cmd.addOutputFileArg("vert.spv");
+        vert_cmd.addFileArg(b.path("./src/renderer/shaders/triangle.vert")); // FIXME
+        exe.root_module.addAnonymousImport("vertex_shader", .{
+            .root_source_file = vert_spv,
+        });
+
+        const frag_cmd = b.addSystemCommand(&.{ "glslc", "--target-env=vulkan1.2", "-o" });
+
+        const frag_spv = frag_cmd.addOutputFileArg("frag.spv");
+        frag_cmd.addFileArg(b.path("./src/renderer/shaders/triangle.frag")); // FIXME
+        exe.root_module.addAnonymousImport("fragment_shader", .{
+            .root_source_file = frag_spv,
         });
     }
 
