@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
 
         const vert_cmd = b.addSystemCommand(&.{ "glslc", "--target-env=vulkan1.3", "-fshader-stage=vert", "-o" });
         const vert_spv = vert_cmd.addOutputFileArg("vert.spv");
-        vert_cmd.addFileArg(b.path("./src/renderer/shaders/triangle.vert")); // FIXME
+        vert_cmd.addFileArg(b.path("./src/renderer/shaders/triangle.vert.hlsl")); // FIXME
         exe.root_module.addAnonymousImport("vertex_shader", .{ .root_source_file = vert_spv });
 
         const frag_cmd = b.addSystemCommand(&.{ "glslc", "--target-env=vulkan1.3", "-fshader-stage=frag", "-o" });
