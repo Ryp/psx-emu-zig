@@ -52,14 +52,8 @@ pub fn main() !void {
     }, null);
     defer gc.dev.destroyPipelineLayout(pipeline_layout, null);
 
-    const render_pass = try createRenderPass(&gc, swapchain);
-    defer gc.dev.destroyRenderPass(render_pass, null);
-
-    const pipeline = try createPipeline(&gc, pipeline_layout, render_pass);
+    const pipeline = try createPipeline(&gc, pipeline_layout, swapchain);
     defer gc.dev.destroyPipeline(pipeline, null);
-
-    var framebuffers = try createFramebuffers(&gc, allocator, render_pass, swapchain);
-    defer destroyFramebuffers(&gc, allocator, framebuffers);
 
     const pool = try gc.dev.createCommandPool(&.{
         .queue_family_index = gc.graphics_queue.family,
@@ -71,9 +65,8 @@ pub fn main() !void {
         pool,
         allocator,
         swapchain.extent,
-        render_pass,
+        swapchain,
         pipeline,
-        framebuffers,
     );
     defer destroyCommandBuffers(&gc, pool, allocator, cmdbufs);
 
@@ -100,18 +93,14 @@ pub fn main() !void {
             extent.height = @intCast(h);
             try swapchain.recreate(extent);
 
-            destroyFramebuffers(&gc, allocator, framebuffers);
-            framebuffers = try createFramebuffers(&gc, allocator, render_pass, swapchain);
-
             destroyCommandBuffers(&gc, pool, allocator, cmdbufs);
             cmdbufs = try createCommandBuffers(
                 &gc,
                 pool,
                 allocator,
                 swapchain.extent,
-                render_pass,
+                swapchain,
                 pipeline,
-                framebuffers,
             );
         }
 
@@ -183,11 +172,10 @@ fn createCommandBuffers(
     pool: vk.CommandPool,
     allocator: Allocator,
     extent: vk.Extent2D,
-    render_pass: vk.RenderPass,
+    swapchain: Swapchain,
     pipeline: vk.Pipeline,
-    framebuffers: []vk.Framebuffer,
 ) ![]vk.CommandBuffer {
-    const cmdbufs = try allocator.alloc(vk.CommandBuffer, framebuffers.len);
+    const cmdbufs = try allocator.alloc(vk.CommandBuffer, swapchain.swap_images.len);
     errdefer allocator.free(cmdbufs);
 
     try gc.dev.allocateCommandBuffers(&.{
@@ -197,7 +185,7 @@ fn createCommandBuffers(
     }, cmdbufs.ptr);
     errdefer gc.dev.freeCommandBuffers(pool, @intCast(cmdbufs.len), cmdbufs.ptr);
 
-    const clear = vk.ClearValue{
+    const clear_value = vk.ClearValue{
         .color = .{ .float_32 = .{ 0, 0, 0, 1 } },
     };
 
@@ -215,7 +203,7 @@ fn createCommandBuffers(
         .extent = extent,
     };
 
-    for (cmdbufs, framebuffers) |cmdbuf, framebuffer| {
+    for (cmdbufs, 0..) |cmdbuf, index| {
         try gc.dev.beginCommandBuffer(cmdbuf, &.{});
 
         gc.dev.cmdSetViewport(cmdbuf, 0, 1, @ptrCast(&viewport));
@@ -227,18 +215,33 @@ fn createCommandBuffers(
             .extent = extent,
         };
 
-        gc.dev.cmdBeginRenderPass(cmdbuf, &.{
-            .render_pass = render_pass,
-            .framebuffer = framebuffer,
+        const swapchain_image_attachment_info = vk.RenderingAttachmentInfo{
+            .image_view = swapchain.swap_images[index].view,
+            .image_layout = .color_attachment_optimal,
+            .resolve_mode = .{},
+            .resolve_image_view = .null_handle,
+            .resolve_image_layout = .undefined,
+            .load_op = .load,
+            .store_op = .store,
+            .clear_value = clear_value,
+        };
+        const rendering_info = vk.RenderingInfo{
             .render_area = render_area,
-            .clear_value_count = 1,
-            .p_clear_values = @ptrCast(&clear),
-        }, .@"inline");
+            .layer_count = 1,
+            .view_mask = 0,
+            .color_attachment_count = 1,
+            .p_color_attachments = @ptrCast(&swapchain_image_attachment_info),
+            .p_depth_attachment = null,
+            .p_stencil_attachment = null,
+        };
+
+        gc.dev.cmdBeginRendering(cmdbuf, &rendering_info);
 
         gc.dev.cmdBindPipeline(cmdbuf, .graphics, pipeline);
         gc.dev.cmdDraw(cmdbuf, 3, 1, 0, 0);
 
-        gc.dev.cmdEndRenderPass(cmdbuf);
+        gc.dev.cmdEndRendering(cmdbuf);
+
         try gc.dev.endCommandBuffer(cmdbuf);
     }
 
@@ -250,68 +253,10 @@ fn destroyCommandBuffers(gc: *const GraphicsContext, pool: vk.CommandPool, alloc
     allocator.free(cmdbufs);
 }
 
-fn createFramebuffers(gc: *const GraphicsContext, allocator: Allocator, render_pass: vk.RenderPass, swapchain: Swapchain) ![]vk.Framebuffer {
-    const framebuffers = try allocator.alloc(vk.Framebuffer, swapchain.swap_images.len);
-    errdefer allocator.free(framebuffers);
-
-    var i: usize = 0;
-    errdefer for (framebuffers[0..i]) |fb| gc.dev.destroyFramebuffer(fb, null);
-
-    for (framebuffers) |*fb| {
-        fb.* = try gc.dev.createFramebuffer(&.{
-            .render_pass = render_pass,
-            .attachment_count = 1,
-            .p_attachments = @ptrCast(&swapchain.swap_images[i].view),
-            .width = swapchain.extent.width,
-            .height = swapchain.extent.height,
-            .layers = 1,
-        }, null);
-        i += 1;
-    }
-
-    return framebuffers;
-}
-
-fn destroyFramebuffers(gc: *const GraphicsContext, allocator: Allocator, framebuffers: []const vk.Framebuffer) void {
-    for (framebuffers) |fb| gc.dev.destroyFramebuffer(fb, null);
-    allocator.free(framebuffers);
-}
-
-fn createRenderPass(gc: *const GraphicsContext, swapchain: Swapchain) !vk.RenderPass {
-    const color_attachment = vk.AttachmentDescription{
-        .format = swapchain.surface_format.format,
-        .samples = .{ .@"1_bit" = true },
-        .load_op = .clear,
-        .store_op = .store,
-        .stencil_load_op = .dont_care,
-        .stencil_store_op = .dont_care,
-        .initial_layout = .undefined,
-        .final_layout = .present_src_khr,
-    };
-
-    const color_attachment_ref = vk.AttachmentReference{
-        .attachment = 0,
-        .layout = .color_attachment_optimal,
-    };
-
-    const subpass = vk.SubpassDescription{
-        .pipeline_bind_point = .graphics,
-        .color_attachment_count = 1,
-        .p_color_attachments = @ptrCast(&color_attachment_ref),
-    };
-
-    return try gc.dev.createRenderPass(&.{
-        .attachment_count = 1,
-        .p_attachments = @ptrCast(&color_attachment),
-        .subpass_count = 1,
-        .p_subpasses = @ptrCast(&subpass),
-    }, null);
-}
-
 fn createPipeline(
     gc: *const GraphicsContext,
     layout: vk.PipelineLayout,
-    render_pass: vk.RenderPass,
+    swapchain: Swapchain,
 ) !vk.Pipeline {
     const vert = try gc.dev.createShaderModule(&.{
         .code_size = vert_spv.len,
@@ -352,9 +297,9 @@ fn createPipeline(
 
     const pvsci = vk.PipelineViewportStateCreateInfo{
         .viewport_count = 1,
-        .p_viewports = undefined, // set in createCommandBuffers with cmdSetViewport
+        .p_viewports = undefined, // Dynamic
         .scissor_count = 1,
-        .p_scissors = undefined, // set in createCommandBuffers with cmdSetScissor
+        .p_scissors = undefined, // Dynamic
     };
 
     const prsci = vk.PipelineRasterizationStateCreateInfo{
@@ -397,6 +342,14 @@ fn createPipeline(
         .blend_constants = [_]f32{ 0, 0, 0, 0 },
     };
 
+    const pipeline_rendering = vk.PipelineRenderingCreateInfo{
+        .view_mask = 0,
+        .color_attachment_count = 1,
+        .p_color_attachment_formats = @ptrCast(&swapchain.surface_format.format),
+        .depth_attachment_format = .undefined,
+        .stencil_attachment_format = .undefined,
+    };
+
     const dynstate = [_]vk.DynamicState{ .viewport, .scissor };
     const pdsci = vk.PipelineDynamicStateCreateInfo{
         .flags = .{},
@@ -405,6 +358,7 @@ fn createPipeline(
     };
 
     const gpci = vk.GraphicsPipelineCreateInfo{
+        .p_next = @ptrCast(&pipeline_rendering),
         .flags = .{},
         .stage_count = 2,
         .p_stages = &pssci,
@@ -418,7 +372,7 @@ fn createPipeline(
         .p_color_blend_state = &pcbsci,
         .p_dynamic_state = &pdsci,
         .layout = layout,
-        .render_pass = render_pass,
+        .render_pass = .null_handle,
         .subpass = 0,
         .base_pipeline_handle = .null_handle,
         .base_pipeline_index = -1,

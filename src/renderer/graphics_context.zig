@@ -18,6 +18,7 @@ const apis: []const vk.ApiInfo = &.{
     },
     // Or you can add entire feature sets or extensions
     vk.features.version_1_0,
+    vk.features.version_1_3,
     vk.extensions.khr_surface,
     vk.extensions.khr_swapchain,
 };
@@ -172,7 +173,13 @@ fn initializeCandidate(instance: Instance, candidate: DeviceCandidate) !vk.Devic
     else
         2;
 
+    const features_vk_1_3 = vk.PhysicalDeviceVulkan13Features{
+        .synchronization_2 = vk.TRUE,
+        .dynamic_rendering = vk.TRUE,
+    };
+
     return try instance.createDevice(candidate.pdev, &.{
+        .p_next = @ptrCast(&features_vk_1_3),
         .queue_create_info_count = queue_count,
         .p_queue_create_infos = &qci,
         .enabled_extension_count = required_device_extensions.len,
