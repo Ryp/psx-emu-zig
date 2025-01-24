@@ -11,6 +11,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    const default_bios_path = b.path("external/bios/SCPH1001.bin");
+    const bios_path = b.option(std.Build.LazyPath, "bios_path", "Path to SCPH1001.BIN") orelse default_bios_path;
+
+    exe.root_module.addAnonymousImport("bios", .{ .root_source_file = bios_path });
+
     const enable_vulkan_backend = b.option(bool, "vulkan", "Enable Vulkan renderer support") orelse false;
     const enable_tracy = b.option(bool, "tracy", "Enable Tracy support") orelse false;
     const tracy_callstack = b.option(bool, "tracy-callstack", "Include callstack information with Tracy data. Does nothing if -Dtracy is not provided") orelse false;
