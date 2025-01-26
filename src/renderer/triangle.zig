@@ -162,21 +162,32 @@ pub fn main() !void {
     var h: c_int = undefined;
     c.glfwGetFramebufferSize(window, &w, &h);
 
+    var should_recreate_swapchain = false;
+
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
         c.glfwPollEvents();
+        c.glfwGetFramebufferSize(window, &w, &h);
 
-        const state = swapchain.wait() catch |err| switch (err) {
+        const fence_wait_result = try gc.dev.waitForFences(1, @ptrCast(&gc.frame_fence), vk.TRUE, std.math.maxInt(u64));
+        std.debug.assert(fence_wait_result == .success);
+
+        try gc.dev.resetFences(1, @ptrCast(&gc.frame_fence));
+
+        if (should_recreate_swapchain) {
+            try swapchain.recreate(extent);
+            should_recreate_swapchain = false;
+        }
+
+        const state = swapchain.acquire_next_image(gc.image_acquired) catch |err| switch (err) {
             error.OutOfDateKHR => Swapchain.PresentState.suboptimal,
             else => |narrow| return narrow,
         };
 
         if (state == .suboptimal or extent.width != @as(u32, @intCast(w)) or extent.height != @as(u32, @intCast(h))) {
-            c.glfwGetFramebufferSize(window, &w, &h);
-
             extent.width = @intCast(w);
             extent.height = @intCast(h);
 
-            try swapchain.recreate(extent);
+            should_recreate_swapchain = true;
         }
 
         try gc.dev.resetCommandPool(pool, .{});
@@ -191,24 +202,30 @@ pub fn main() !void {
         const wait_stage = [_]vk.PipelineStageFlags{.{ .bottom_of_pipe_bit = true }};
         try gc.dev.queueSubmit(gc.graphics_queue.handle, 1, &[_]vk.SubmitInfo{.{
             .wait_semaphore_count = 1,
-            .p_wait_semaphores = @ptrCast(&swapchain.image_acquired),
+            .p_wait_semaphores = @ptrCast(&gc.image_acquired),
             .p_wait_dst_stage_mask = &wait_stage,
             .command_buffer_count = 1,
             .p_command_buffers = @ptrCast(&cmdbuf),
             .signal_semaphore_count = 1,
-            .p_signal_semaphores = @ptrCast(&swapchain.render_finished),
-        }}, swapchain.frame_fence);
+            .p_signal_semaphores = @ptrCast(&gc.render_finished),
+        }}, gc.frame_fence);
 
-        _ = try gc.dev.queuePresentKHR(gc.present_queue.handle, &.{
+        const present_result = try gc.dev.queuePresentKHR(gc.present_queue.handle, &.{
             .wait_semaphore_count = 1,
-            .p_wait_semaphores = @ptrCast(&swapchain.render_finished),
+            .p_wait_semaphores = @ptrCast(&gc.render_finished),
             .swapchain_count = 1,
             .p_swapchains = @ptrCast(&swapchain.handle),
             .p_image_indices = @ptrCast(&swapchain.image_index),
         });
+
+        if (present_result == .error_out_of_date_khr or present_result == .suboptimal_khr) {
+            should_recreate_swapchain = true;
+        } else {
+            std.debug.assert(present_result == .success);
+        }
     }
 
-    const result = try gc.dev.waitForFences(1, @ptrCast(&swapchain.frame_fence), vk.TRUE, std.math.maxInt(u64));
+    const result = try gc.dev.waitForFences(1, @ptrCast(&gc.frame_fence), vk.TRUE, std.math.maxInt(u64));
     std.debug.assert(result == .success);
 
     try gc.dev.deviceWaitIdle();

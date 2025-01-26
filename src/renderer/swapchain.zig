@@ -16,9 +16,6 @@ pub const Swapchain = struct {
     present_mode: vk.PresentModeKHR,
     extent: vk.Extent2D,
     handle: vk.SwapchainKHR,
-    frame_fence: vk.Fence,
-    image_acquired: vk.Semaphore,
-    render_finished: vk.Semaphore,
 
     needs_transition: bool,
     swap_images: []SwapImage,
@@ -79,21 +76,6 @@ pub const Swapchain = struct {
             allocator.free(swap_images);
         }
 
-        const frame_fence = try gc.dev.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
-        errdefer gc.dev.destroyFence(frame_fence, null);
-
-        try gc.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .fence, .object_handle = @intFromEnum(frame_fence), .p_object_name = "FENCE" });
-
-        const image_acquired = try gc.dev.createSemaphore(&.{}, null);
-        errdefer gc.dev.destroySemaphore(image_acquired, null);
-
-        try gc.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .semaphore, .object_handle = @intFromEnum(image_acquired), .p_object_name = "Image acquired" });
-
-        const render_finished = try gc.dev.createSemaphore(&.{}, null);
-        errdefer gc.dev.destroySemaphore(render_finished, null);
-
-        try gc.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .semaphore, .object_handle = @intFromEnum(render_finished), .p_object_name = "Rendering finished" });
-
         return Swapchain{
             .gc = gc,
             .allocator = allocator,
@@ -101,9 +83,6 @@ pub const Swapchain = struct {
             .present_mode = present_mode,
             .extent = actual_extent,
             .handle = handle,
-            .frame_fence = frame_fence,
-            .image_acquired = image_acquired,
-            .render_finished = render_finished,
             .needs_transition = true,
             .swap_images = swap_images,
             .image_index = undefined,
@@ -111,11 +90,11 @@ pub const Swapchain = struct {
     }
 
     fn deinitExceptSwapchain(self: Swapchain) void {
-        for (self.swap_images) |si| si.deinit(self.gc);
+        for (self.swap_images) |si| {
+            si.deinit(self.gc);
+        }
+
         self.allocator.free(self.swap_images);
-        self.gc.dev.destroyFence(self.frame_fence, null);
-        self.gc.dev.destroySemaphore(self.image_acquired, null);
-        self.gc.dev.destroySemaphore(self.render_finished, null);
     }
 
     pub fn deinit(self: Swapchain) void {
@@ -131,26 +110,8 @@ pub const Swapchain = struct {
         self.* = try initRecycle(gc, allocator, new_extent, old_handle);
     }
 
-    pub fn currentImage(self: Swapchain) vk.Image {
-        return self.swap_images[self.image_index].image;
-    }
-
-    pub fn currentSwapImage(self: Swapchain) *const SwapImage {
-        return &self.swap_images[self.image_index];
-    }
-
-    pub fn wait(self: *Swapchain) !PresentState {
-        {
-            const result = try self.gc.dev.waitForFences(1, @ptrCast(&self.frame_fence), vk.TRUE, std.math.maxInt(u64));
-            std.debug.assert(result == .success);
-
-            try self.gc.dev.resetFences(1, @ptrCast(&self.frame_fence));
-        }
-
-        const result = try self.gc.dev.acquireNextImageKHR(self.handle, std.math.maxInt(u64), self.image_acquired, .null_handle);
-        if (result.result != .success) {
-            return error.ImageAcquireFailed;
-        }
+    pub fn acquire_next_image(self: *Swapchain, semaphore: vk.Semaphore) !PresentState {
+        const result = try self.gc.dev.acquireNextImageKHR(self.handle, std.math.maxInt(u64), semaphore, .null_handle);
 
         self.image_index = result.image_index;
 

@@ -7,7 +7,7 @@ const required_instance_extensions = [_][*:0]const u8{
     vk.extensions.ext_debug_utils.name,
 };
 
-const required_instance_layers = [_][*:0]const u8{
+const enabled_instance_layers = [_][*:0]const u8{
     "VK_LAYER_KHRONOS_validation",
 };
 
@@ -55,6 +55,10 @@ pub const GraphicsContext = struct {
     pdev: vk.PhysicalDevice,
     props: vk.PhysicalDeviceProperties,
     mem_props: vk.PhysicalDeviceMemoryProperties,
+    frame_fence: vk.Fence,
+    image_acquired: vk.Semaphore,
+    render_finished: vk.Semaphore,
+
     debug_utils_messenger: vk.DebugUtilsMessengerEXT,
 
     dev: Device,
@@ -78,6 +82,7 @@ pub const GraphicsContext = struct {
                     break;
                 }
             } else {
+                std.debug.print("required instance extension {s} not supported\n", .{ext});
                 unreachable;
             }
         }
@@ -85,9 +90,12 @@ pub const GraphicsContext = struct {
         var enabled_instance_extensions = try allocator.alloc([*:0]const u8, glfw_exts_count + required_instance_extensions.len);
         defer allocator.free(enabled_instance_extensions);
 
-        for (enabled_instance_extensions[0..glfw_exts_count], glfw_exts[0..glfw_exts_count]) |*ext, glfw_ext| {
-            ext.* = glfw_ext;
+        if (glfw_exts_count > 0) {
+            for (enabled_instance_extensions[0..glfw_exts_count], glfw_exts[0..glfw_exts_count]) |*ext, glfw_ext| {
+                ext.* = glfw_ext;
+            }
         }
+
         for (enabled_instance_extensions[glfw_exts_count..], required_instance_extensions) |*ext, required_ext_name| {
             ext.* = required_ext_name;
         }
@@ -102,8 +110,8 @@ pub const GraphicsContext = struct {
 
         const instance = try self.vkb.createInstance(&.{
             .p_application_info = &app_info,
-            .enabled_layer_count = @intCast(required_instance_layers.len),
-            .pp_enabled_layer_names = @ptrCast(&required_instance_layers),
+            .enabled_layer_count = @intCast(enabled_instance_layers.len),
+            .pp_enabled_layer_names = @ptrCast(&enabled_instance_layers),
             .enabled_extension_count = @intCast(enabled_instance_extensions.len),
             .pp_enabled_extension_names = @ptrCast(enabled_instance_extensions),
         }, null);
@@ -145,10 +153,29 @@ pub const GraphicsContext = struct {
 
         self.mem_props = self.instance.getPhysicalDeviceMemoryProperties(self.pdev);
 
+        self.frame_fence = try self.dev.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
+        errdefer self.dev.destroyFence(self.frame_fence, null);
+
+        try self.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .fence, .object_handle = @intFromEnum(self.frame_fence), .p_object_name = "Frame fence" });
+
+        self.image_acquired = try self.dev.createSemaphore(&.{}, null);
+        errdefer self.dev.destroySemaphore(self.image_acquired, null);
+
+        try self.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .semaphore, .object_handle = @intFromEnum(self.image_acquired), .p_object_name = "Image acquired" });
+
+        self.render_finished = try self.dev.createSemaphore(&.{}, null);
+        errdefer self.dev.destroySemaphore(self.render_finished, null);
+
+        try self.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .semaphore, .object_handle = @intFromEnum(self.render_finished), .p_object_name = "Rendering finished" });
+
         return self;
     }
 
     pub fn deinit(self: GraphicsContext) void {
+        self.dev.destroyFence(self.frame_fence, null);
+        self.dev.destroySemaphore(self.image_acquired, null);
+        self.dev.destroySemaphore(self.render_finished, null);
+
         self.dev.destroyDevice(null);
 
         self.instance.destroyDebugUtilsMessengerEXT(self.debug_utils_messenger, null);
