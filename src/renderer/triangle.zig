@@ -10,6 +10,93 @@ const frag_spv align(@alignOf(u32)) = @embedFile("fragment_shader").*;
 
 const app_name = "vulkan-zig triangle example";
 
+const GPUTextureAccess = struct {
+    stage_mask: vk.PipelineStageFlags2,
+    access_mask: vk.AccessFlags2,
+    image_layout: vk.ImageLayout,
+};
+
+const swapchain_access_initial = GPUTextureAccess{
+    .stage_mask = .{ .bottom_of_pipe_bit = true },
+    .access_mask = .{},
+    .image_layout = .undefined,
+};
+
+const swapchain_access_present = GPUTextureAccess{
+    .stage_mask = .{ .bottom_of_pipe_bit = true },
+    .access_mask = .{},
+    .image_layout = .present_src_khr,
+};
+
+const swapchain_access_render = GPUTextureAccess{
+    .stage_mask = .{ .color_attachment_output_bit = true },
+    .access_mask = .{ .color_attachment_write_bit = true },
+    .image_layout = .attachment_optimal,
+};
+
+const ViewAspect = enum(u32) {
+    Color = 1,
+    Depth = 2,
+    Stencil = 4,
+};
+
+const GPUTextureSubresource = struct {
+    aspect: vk.ImageAspectFlags,
+    mip_offset: u32,
+    mip_count: u32,
+    layer_offset: u32,
+    layer_count: u32,
+};
+
+fn default_texture_subresource_one_color_mip(mip_index: u32, layer_index: u32) GPUTextureSubresource {
+    return .{
+        .aspect = .{ .color_bit = true },
+        .mip_offset = mip_index,
+        .mip_count = 1,
+        .layer_offset = layer_index,
+        .layer_count = 1,
+    };
+}
+
+fn get_vk_image_subresource_range(subresource: GPUTextureSubresource) vk.ImageSubresourceRange {
+    return .{
+        .aspect_mask = subresource.aspect,
+        .base_mip_level = subresource.mip_offset,
+        .level_count = subresource.mip_count,
+        .base_array_layer = subresource.layer_offset,
+        .layer_count = subresource.layer_count,
+    };
+}
+
+fn get_vk_image_barrier(handle: vk.Image, subresource: GPUTextureSubresource, src: GPUTextureAccess, dst: GPUTextureAccess, src_queue_family_index: u32, dst_queue_family_index: u32) vk.ImageMemoryBarrier2 {
+    const view_range = get_vk_image_subresource_range(subresource);
+
+    return .{
+        .src_stage_mask = src.stage_mask,
+        .src_access_mask = src.access_mask,
+        .dst_stage_mask = dst.stage_mask,
+        .dst_access_mask = dst.access_mask,
+        .old_layout = src.image_layout,
+        .new_layout = dst.image_layout,
+        .src_queue_family_index = src_queue_family_index,
+        .dst_queue_family_index = dst_queue_family_index,
+        .image = handle,
+        .subresource_range = view_range,
+    };
+}
+
+fn get_vk_image_barrier_depency_info(barriers: []const vk.ImageMemoryBarrier2) vk.DependencyInfo {
+    return .{
+        .dependency_flags = .{},
+        .memory_barrier_count = 0,
+        .p_memory_barriers = null,
+        .buffer_memory_barrier_count = 0,
+        .p_buffer_memory_barriers = null,
+        .image_memory_barrier_count = @intCast(barriers.len),
+        .p_image_memory_barriers = @ptrCast(barriers),
+    };
+}
+
 pub fn main() !void {
     if (c.glfwInit() != c.GLFW_TRUE) return error.GlfwInitFailed;
     defer c.glfwTerminate();
@@ -55,59 +142,75 @@ pub fn main() !void {
     const pipeline = try createPipeline(&gc, pipeline_layout, swapchain);
     defer gc.dev.destroyPipeline(pipeline, null);
 
+    // FIXME resettable flag?
     const pool = try gc.dev.createCommandPool(&.{
+        .flags = .{ .reset_command_buffer_bit = true },
         .queue_family_index = gc.graphics_queue.family,
     }, null);
     defer gc.dev.destroyCommandPool(pool, null);
 
-    var cmdbufs = try createCommandBuffers(
-        &gc,
-        pool,
-        allocator,
-        swapchain.extent,
-        swapchain,
-        pipeline,
-    );
-    defer destroyCommandBuffers(&gc, pool, allocator, cmdbufs);
+    var cmdbuf: vk.CommandBuffer = undefined;
+
+    try gc.dev.allocateCommandBuffers(&.{
+        .command_pool = pool,
+        .level = .primary,
+        .command_buffer_count = 1,
+    }, @ptrCast(&cmdbuf));
+    defer gc.dev.freeCommandBuffers(pool, 1, @ptrCast(&cmdbuf));
+
+    var w: c_int = undefined;
+    var h: c_int = undefined;
+    c.glfwGetFramebufferSize(window, &w, &h);
 
     while (c.glfwWindowShouldClose(window) == c.GLFW_FALSE) {
-        var w: c_int = undefined;
-        var h: c_int = undefined;
-        c.glfwGetFramebufferSize(window, &w, &h);
+        c.glfwPollEvents();
 
-        // Don't present or resize swapchain while the window is minimized
-        if (w == 0 or h == 0) {
-            c.glfwPollEvents();
-            continue;
-        }
-
-        const cmdbuf = cmdbufs[swapchain.image_index];
-
-        const state = swapchain.present(cmdbuf) catch |err| switch (err) {
+        const state = swapchain.wait() catch |err| switch (err) {
             error.OutOfDateKHR => Swapchain.PresentState.suboptimal,
             else => |narrow| return narrow,
         };
 
         if (state == .suboptimal or extent.width != @as(u32, @intCast(w)) or extent.height != @as(u32, @intCast(h))) {
+            c.glfwGetFramebufferSize(window, &w, &h);
+
             extent.width = @intCast(w);
             extent.height = @intCast(h);
-            try swapchain.recreate(extent);
 
-            destroyCommandBuffers(&gc, pool, allocator, cmdbufs);
-            cmdbufs = try createCommandBuffers(
-                &gc,
-                pool,
-                allocator,
-                swapchain.extent,
-                swapchain,
-                pipeline,
-            );
+            try swapchain.recreate(extent);
         }
 
-        c.glfwPollEvents();
+        try gc.dev.resetCommandPool(pool, .{});
+
+        try record_command_buffer(
+            &gc,
+            cmdbuf,
+            &swapchain,
+            pipeline,
+        );
+
+        const wait_stage = [_]vk.PipelineStageFlags{.{ .bottom_of_pipe_bit = true }};
+        try gc.dev.queueSubmit(gc.graphics_queue.handle, 1, &[_]vk.SubmitInfo{.{
+            .wait_semaphore_count = 1,
+            .p_wait_semaphores = @ptrCast(&swapchain.image_acquired),
+            .p_wait_dst_stage_mask = &wait_stage,
+            .command_buffer_count = 1,
+            .p_command_buffers = @ptrCast(&cmdbuf),
+            .signal_semaphore_count = 1,
+            .p_signal_semaphores = @ptrCast(&swapchain.render_finished),
+        }}, swapchain.frame_fence);
+
+        _ = try gc.dev.queuePresentKHR(gc.present_queue.handle, &.{
+            .wait_semaphore_count = 1,
+            .p_wait_semaphores = @ptrCast(&swapchain.render_finished),
+            .swapchain_count = 1,
+            .p_swapchains = @ptrCast(&swapchain.handle),
+            .p_image_indices = @ptrCast(&swapchain.image_index),
+        });
     }
 
-    try swapchain.waitForAllFences();
+    const result = try gc.dev.waitForFences(1, @ptrCast(&swapchain.frame_fence), vk.TRUE, std.math.maxInt(u64));
+    std.debug.assert(result == .success);
+
     try gc.dev.deviceWaitIdle();
 }
 
@@ -167,23 +270,44 @@ fn copyBuffer(gc: *const GraphicsContext, pool: vk.CommandPool, dst: vk.Buffer, 
     try gc.dev.queueWaitIdle(gc.graphics_queue.handle);
 }
 
-fn createCommandBuffers(
+fn record_command_buffer(
     gc: *const GraphicsContext,
-    pool: vk.CommandPool,
-    allocator: Allocator,
-    extent: vk.Extent2D,
-    swapchain: Swapchain,
+    cmdbuf: vk.CommandBuffer,
+    swapchain: *Swapchain,
     pipeline: vk.Pipeline,
-) ![]vk.CommandBuffer {
-    const cmdbufs = try allocator.alloc(vk.CommandBuffer, swapchain.swap_images.len);
-    errdefer allocator.free(cmdbufs);
+) !void {
+    try gc.dev.beginCommandBuffer(cmdbuf, &.{});
 
-    try gc.dev.allocateCommandBuffers(&.{
-        .command_pool = pool,
-        .level = .primary,
-        .command_buffer_count = @intCast(cmdbufs.len),
-    }, cmdbufs.ptr);
-    errdefer gc.dev.freeCommandBuffers(pool, @intCast(cmdbufs.len), cmdbufs.ptr);
+    if (swapchain.needs_transition) {
+        var image_barriers = try std.BoundedArray(vk.ImageMemoryBarrier2, 8).init(swapchain.swap_images.len);
+
+        for (swapchain.swap_images, 0..) |swapchain_image, swapchain_image_index| {
+            const src = swapchain_access_initial;
+            const dst = if (swapchain_image_index == swapchain.image_index)
+                swapchain_access_render
+            else
+                swapchain_access_present;
+
+            const subresource = default_texture_subresource_one_color_mip(0, 0);
+
+            image_barriers.slice()[swapchain_image_index] = get_vk_image_barrier(swapchain_image.image, subresource, src, dst, 0, 0);
+        }
+
+        const dependencies = get_vk_image_barrier_depency_info(image_barriers.constSlice());
+
+        gc.dev.cmdPipelineBarrier2(cmdbuf, &dependencies);
+
+        swapchain.needs_transition = false;
+    } else {
+        const subresource = default_texture_subresource_one_color_mip(0, 0);
+
+        const image_barrier = get_vk_image_barrier(swapchain.swap_images[swapchain.image_index].image, subresource, swapchain_access_present, swapchain_access_render, 0, 0);
+        const image_barriers: [1]vk.ImageMemoryBarrier2 = .{image_barrier};
+
+        const dependencies = get_vk_image_barrier_depency_info(&image_barriers);
+
+        gc.dev.cmdPipelineBarrier2(cmdbuf, &dependencies);
+    }
 
     const clear_value = vk.ClearValue{
         .color = .{ .float_32 = .{ 0, 0, 0, 1 } },
@@ -192,65 +316,65 @@ fn createCommandBuffers(
     const viewport = vk.Viewport{
         .x = 0,
         .y = 0,
-        .width = @floatFromInt(extent.width),
-        .height = @floatFromInt(extent.height),
+        .width = @floatFromInt(swapchain.extent.width),
+        .height = @floatFromInt(swapchain.extent.height),
         .min_depth = 0,
         .max_depth = 1,
     };
 
     const scissor = vk.Rect2D{
         .offset = .{ .x = 0, .y = 0 },
-        .extent = extent,
+        .extent = swapchain.extent,
     };
 
-    for (cmdbufs, 0..) |cmdbuf, index| {
-        try gc.dev.beginCommandBuffer(cmdbuf, &.{});
+    gc.dev.cmdSetViewport(cmdbuf, 0, 1, @ptrCast(&viewport));
+    gc.dev.cmdSetScissor(cmdbuf, 0, 1, @ptrCast(&scissor));
 
-        gc.dev.cmdSetViewport(cmdbuf, 0, 1, @ptrCast(&viewport));
-        gc.dev.cmdSetScissor(cmdbuf, 0, 1, @ptrCast(&scissor));
+    // This needs to be a separate definition - see https://github.com/ziglang/zig/issues/7627.
+    const render_area = vk.Rect2D{
+        .offset = .{ .x = 0, .y = 0 },
+        .extent = swapchain.extent,
+    };
 
-        // This needs to be a separate definition - see https://github.com/ziglang/zig/issues/7627.
-        const render_area = vk.Rect2D{
-            .offset = .{ .x = 0, .y = 0 },
-            .extent = extent,
-        };
+    const swapchain_image_attachment_info = vk.RenderingAttachmentInfo{
+        .image_view = swapchain.swap_images[swapchain.image_index].view, // FIXME careful with the index and when it's updated!
+        .image_layout = .color_attachment_optimal,
+        .resolve_mode = .{},
+        .resolve_image_view = .null_handle,
+        .resolve_image_layout = .undefined,
+        .load_op = .load,
+        .store_op = .store,
+        .clear_value = clear_value,
+    };
+    const rendering_info = vk.RenderingInfo{
+        .render_area = render_area,
+        .layer_count = 1,
+        .view_mask = 0,
+        .color_attachment_count = 1,
+        .p_color_attachments = @ptrCast(&swapchain_image_attachment_info),
+        .p_depth_attachment = null,
+        .p_stencil_attachment = null,
+    };
 
-        const swapchain_image_attachment_info = vk.RenderingAttachmentInfo{
-            .image_view = swapchain.swap_images[index].view,
-            .image_layout = .color_attachment_optimal,
-            .resolve_mode = .{},
-            .resolve_image_view = .null_handle,
-            .resolve_image_layout = .undefined,
-            .load_op = .load,
-            .store_op = .store,
-            .clear_value = clear_value,
-        };
-        const rendering_info = vk.RenderingInfo{
-            .render_area = render_area,
-            .layer_count = 1,
-            .view_mask = 0,
-            .color_attachment_count = 1,
-            .p_color_attachments = @ptrCast(&swapchain_image_attachment_info),
-            .p_depth_attachment = null,
-            .p_stencil_attachment = null,
-        };
+    gc.dev.cmdBeginRendering(cmdbuf, &rendering_info);
 
-        gc.dev.cmdBeginRendering(cmdbuf, &rendering_info);
+    gc.dev.cmdBindPipeline(cmdbuf, .graphics, pipeline);
+    gc.dev.cmdDraw(cmdbuf, 3, 1, 0, 0);
 
-        gc.dev.cmdBindPipeline(cmdbuf, .graphics, pipeline);
-        gc.dev.cmdDraw(cmdbuf, 3, 1, 0, 0);
+    gc.dev.cmdEndRendering(cmdbuf);
 
-        gc.dev.cmdEndRendering(cmdbuf);
+    {
+        const subresource = default_texture_subresource_one_color_mip(0, 0);
 
-        try gc.dev.endCommandBuffer(cmdbuf);
+        const image_barrier = get_vk_image_barrier(swapchain.swap_images[swapchain.image_index].image, subresource, swapchain_access_render, swapchain_access_present, 0, 0);
+        const image_barriers: [1]vk.ImageMemoryBarrier2 = .{image_barrier};
+
+        const dependencies = get_vk_image_barrier_depency_info(&image_barriers);
+
+        gc.dev.cmdPipelineBarrier2(cmdbuf, &dependencies);
     }
 
-    return cmdbufs;
-}
-
-fn destroyCommandBuffers(gc: *const GraphicsContext, pool: vk.CommandPool, allocator: Allocator, cmdbufs: []vk.CommandBuffer) void {
-    gc.dev.freeCommandBuffers(pool, @truncate(cmdbufs.len), cmdbufs.ptr);
-    allocator.free(cmdbufs);
+    try gc.dev.endCommandBuffer(cmdbuf);
 }
 
 fn createPipeline(

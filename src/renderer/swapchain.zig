@@ -16,10 +16,13 @@ pub const Swapchain = struct {
     present_mode: vk.PresentModeKHR,
     extent: vk.Extent2D,
     handle: vk.SwapchainKHR,
+    frame_fence: vk.Fence,
+    image_acquired: vk.Semaphore,
+    render_finished: vk.Semaphore,
 
+    needs_transition: bool,
     swap_images: []SwapImage,
     image_index: u32,
-    next_image_acquired: vk.Semaphore,
 
     pub fn init(gc: *const GraphicsContext, allocator: Allocator, extent: vk.Extent2D) !Swapchain {
         return try initRecycle(gc, allocator, extent, .null_handle);
@@ -76,15 +79,21 @@ pub const Swapchain = struct {
             allocator.free(swap_images);
         }
 
-        var next_image_acquired = try gc.dev.createSemaphore(&.{}, null);
-        errdefer gc.dev.destroySemaphore(next_image_acquired, null);
+        const frame_fence = try gc.dev.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
+        errdefer gc.dev.destroyFence(frame_fence, null);
 
-        const result = try gc.dev.acquireNextImageKHR(handle, std.math.maxInt(u64), next_image_acquired, .null_handle);
-        if (result.result != .success) {
-            return error.ImageAcquireFailed;
-        }
+        try gc.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .fence, .object_handle = @intFromEnum(frame_fence), .p_object_name = "FENCE" });
 
-        std.mem.swap(vk.Semaphore, &swap_images[result.image_index].image_acquired, &next_image_acquired);
+        const image_acquired = try gc.dev.createSemaphore(&.{}, null);
+        errdefer gc.dev.destroySemaphore(image_acquired, null);
+
+        try gc.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .semaphore, .object_handle = @intFromEnum(image_acquired), .p_object_name = "Image acquired" });
+
+        const render_finished = try gc.dev.createSemaphore(&.{}, null);
+        errdefer gc.dev.destroySemaphore(render_finished, null);
+
+        try gc.dev.setDebugUtilsObjectNameEXT(&.{ .object_type = .semaphore, .object_handle = @intFromEnum(render_finished), .p_object_name = "Rendering finished" });
+
         return Swapchain{
             .gc = gc,
             .allocator = allocator,
@@ -92,20 +101,21 @@ pub const Swapchain = struct {
             .present_mode = present_mode,
             .extent = actual_extent,
             .handle = handle,
+            .frame_fence = frame_fence,
+            .image_acquired = image_acquired,
+            .render_finished = render_finished,
+            .needs_transition = true,
             .swap_images = swap_images,
-            .image_index = result.image_index,
-            .next_image_acquired = next_image_acquired,
+            .image_index = undefined,
         };
     }
 
     fn deinitExceptSwapchain(self: Swapchain) void {
         for (self.swap_images) |si| si.deinit(self.gc);
         self.allocator.free(self.swap_images);
-        self.gc.dev.destroySemaphore(self.next_image_acquired, null);
-    }
-
-    pub fn waitForAllFences(self: Swapchain) !void {
-        for (self.swap_images) |si| si.waitForFence(self.gc) catch {};
+        self.gc.dev.destroyFence(self.frame_fence, null);
+        self.gc.dev.destroySemaphore(self.image_acquired, null);
+        self.gc.dev.destroySemaphore(self.render_finished, null);
     }
 
     pub fn deinit(self: Swapchain) void {
@@ -129,59 +139,19 @@ pub const Swapchain = struct {
         return &self.swap_images[self.image_index];
     }
 
-    pub fn present(self: *Swapchain, cmdbuf: vk.CommandBuffer) !PresentState {
-        // Simple method:
-        // 1) Acquire next image
-        // 2) Wait for and reset fence of the acquired image
-        // 3) Submit command buffer with fence of acquired image,
-        //    dependendent on the semaphore signalled by the first step.
-        // 4) Present current frame, dependent on semaphore signalled by previous step
-        // Problem: This way we can't reference the current image while rendering.
-        // Better method: Shuffle the steps around such that acquire next image is the last step,
-        // leaving the swapchain in a state with the current image.
-        // 1) Wait for and reset fence of current image
-        // 2) Submit command buffer, signalling fence of current image and dependent on
-        //    the semaphore signalled by step 4.
-        // 3) Present current frame, dependent on semaphore signalled by the submit
-        // 4) Acquire next image, signalling its semaphore
-        // One problem that arises is that we can't know beforehand which semaphore to signal,
-        // so we keep an extra auxilery semaphore that is swapped around
+    pub fn wait(self: *Swapchain) !PresentState {
+        {
+            const result = try self.gc.dev.waitForFences(1, @ptrCast(&self.frame_fence), vk.TRUE, std.math.maxInt(u64));
+            std.debug.assert(result == .success);
 
-        // Step 1: Make sure the current frame has finished rendering
-        const current = self.currentSwapImage();
-        try current.waitForFence(self.gc);
-        try self.gc.dev.resetFences(1, @ptrCast(&current.frame_fence));
+            try self.gc.dev.resetFences(1, @ptrCast(&self.frame_fence));
+        }
 
-        // Step 2: Submit the command buffer
-        const wait_stage = [_]vk.PipelineStageFlags{.{ .top_of_pipe_bit = true }};
-        try self.gc.dev.queueSubmit(self.gc.graphics_queue.handle, 1, &[_]vk.SubmitInfo{.{
-            .wait_semaphore_count = 1,
-            .p_wait_semaphores = @ptrCast(&current.image_acquired),
-            .p_wait_dst_stage_mask = &wait_stage,
-            .command_buffer_count = 1,
-            .p_command_buffers = @ptrCast(&cmdbuf),
-            .signal_semaphore_count = 1,
-            .p_signal_semaphores = @ptrCast(&current.render_finished),
-        }}, current.frame_fence);
+        const result = try self.gc.dev.acquireNextImageKHR(self.handle, std.math.maxInt(u64), self.image_acquired, .null_handle);
+        if (result.result != .success) {
+            return error.ImageAcquireFailed;
+        }
 
-        // Step 3: Present the current frame
-        _ = try self.gc.dev.queuePresentKHR(self.gc.present_queue.handle, &.{
-            .wait_semaphore_count = 1,
-            .p_wait_semaphores = @ptrCast(&current.render_finished),
-            .swapchain_count = 1,
-            .p_swapchains = @ptrCast(&self.handle),
-            .p_image_indices = @ptrCast(&self.image_index),
-        });
-
-        // Step 4: Acquire next frame
-        const result = try self.gc.dev.acquireNextImageKHR(
-            self.handle,
-            std.math.maxInt(u64),
-            self.next_image_acquired,
-            .null_handle,
-        );
-
-        std.mem.swap(vk.Semaphore, &self.swap_images[result.image_index].image_acquired, &self.next_image_acquired);
         self.image_index = result.image_index;
 
         return switch (result.result) {
@@ -195,9 +165,6 @@ pub const Swapchain = struct {
 const SwapImage = struct {
     image: vk.Image,
     view: vk.ImageView,
-    image_acquired: vk.Semaphore,
-    render_finished: vk.Semaphore,
-    frame_fence: vk.Fence,
 
     fn init(gc: *const GraphicsContext, image: vk.Image, format: vk.Format) !SwapImage {
         const view = try gc.dev.createImageView(&.{
@@ -215,34 +182,14 @@ const SwapImage = struct {
         }, null);
         errdefer gc.dev.destroyImageView(view, null);
 
-        const image_acquired = try gc.dev.createSemaphore(&.{}, null);
-        errdefer gc.dev.destroySemaphore(image_acquired, null);
-
-        const render_finished = try gc.dev.createSemaphore(&.{}, null);
-        errdefer gc.dev.destroySemaphore(render_finished, null);
-
-        const frame_fence = try gc.dev.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
-        errdefer gc.dev.destroyFence(frame_fence, null);
-
         return SwapImage{
             .image = image,
             .view = view,
-            .image_acquired = image_acquired,
-            .render_finished = render_finished,
-            .frame_fence = frame_fence,
         };
     }
 
     fn deinit(self: SwapImage, gc: *const GraphicsContext) void {
-        self.waitForFence(gc) catch return;
         gc.dev.destroyImageView(self.view, null);
-        gc.dev.destroySemaphore(self.image_acquired, null);
-        gc.dev.destroySemaphore(self.render_finished, null);
-        gc.dev.destroyFence(self.frame_fence, null);
-    }
-
-    fn waitForFence(self: SwapImage, gc: *const GraphicsContext) !void {
-        _ = try gc.dev.waitForFences(1, @ptrCast(&self.frame_fence), vk.TRUE, std.math.maxInt(u64));
     }
 };
 
