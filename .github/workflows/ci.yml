@@ -7,8 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        #os: [ubuntu-latest, macos-latest, windows-latest]
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{matrix.os}}
     steps:
       - uses: actions/checkout@v4
@@ -19,8 +18,6 @@ jobs:
         # with:
         #   version: ${{ env.zig_version }}
       # Ubuntu-specific bit
-      - run: sudo apt-get update -qq
-      - run: sudo apt-get install -y libsdl2-dev
       - run: zig build
       - run: zig build test
 

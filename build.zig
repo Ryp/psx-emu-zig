@@ -36,6 +36,7 @@ pub fn build(b: *std.Build) void {
         const registry_path = registry.path("registry/vk.xml");
         vk_generate_cmd.addFileArg(registry_path);
 
+        exe.linkLibC();
         exe.linkSystemLibrary("glfw");
 
         exe.root_module.addAnonymousImport("vulkan", .{
@@ -66,9 +67,6 @@ pub fn build(b: *std.Build) void {
     }
 
     b.installArtifact(exe);
-
-    exe.linkSystemLibrary("c");
-    exe.linkSystemLibrary("SDL2");
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
